@@ -15,7 +15,7 @@ import Profile from './pages/Profile';
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [user, setUser] = useState(null);
-  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('stryvon_splash_played'));
+  const [showSplash, setShowSplash] = useState(true);
 
   // Enforce permanent dark mode (Figma design system)
   useEffect(() => {
@@ -35,7 +35,6 @@ export default function App() {
   }, [token]);
 
   const handleSplashFinish = () => {
-    sessionStorage.setItem('stryvon_splash_played', 'true');
     setShowSplash(false);
   };
 

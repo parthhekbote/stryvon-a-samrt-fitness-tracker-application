@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StryvonLogo from '../components/StryvonLogo';
+import StryvonMotionGraphic from '../components/StryvonMotionGraphic';
 import { auth, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from '../config/firebase';
+import { usePrefersReducedMotion } from '../utils/animationPresets';
 import { 
   Mail, 
   Lock, 
@@ -16,6 +18,7 @@ import {
 } from 'lucide-react';
 
 export default function LoginRegister({ onLogin, apiUrl }) {
+  const prefersReducedMotion = usePrefersReducedMotion();
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
   const [welcomeBanner, setWelcomeBanner] = useState('');
@@ -156,20 +159,64 @@ export default function LoginRegister({ onLogin, apiUrl }) {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-[#0A0A0A] text-[#E5E5E5] font-sans overflow-hidden">
+    <div className="min-h-screen w-full flex bg-[#0A0A0A] text-[#E5E5E5] font-sans overflow-hidden relative">
 
-      {/* LEFT COLUMN: Motivating Cinematic Hero Panel with Bodybuilder Background */}
-      <div className="hidden lg:flex flex-col justify-between w-1/2 p-14 border-r border-[#474747]/30 relative overflow-hidden bg-[#0A0A0A]">
+      {/* LEFT COLUMN: Motivating Cinematic Hero Panel with Bodybuilder Background & Ambient Motion */}
+      <div className="hidden lg:flex flex-col justify-between w-1/2 p-14 relative overflow-hidden bg-[#0A0A0A]">
         
-        {/* Organic Soft Smudge Glow Blobs (Behind Image) */}
-        <div className="absolute top-1/3 left-1/4 w-[28rem] h-[28rem] bg-[#D4FF00]/15 rounded-full blur-[140px] pointer-events-none z-0" />
-        <div className="absolute -bottom-10 right-10 w-96 h-96 bg-[#D4FF00]/10 rounded-full blur-[160px] pointer-events-none z-0" />
+        {/* Layer 1: Organic Deep Background Smudge Glow Blobs (Drifting Slow Loop) */}
+        <motion.div 
+          animate={
+            prefersReducedMotion 
+              ? {} 
+              : { 
+                  x: [0, 35, -25, 0],
+                  y: [0, -45, 25, 0],
+                  scale: [1, 1.12, 0.92, 1],
+                  opacity: [0.15, 0.25, 0.15]
+                }
+          }
+          transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/4 left-1/4 w-[28rem] h-[28rem] bg-[#D4FF00]/15 rounded-full blur-[140px] pointer-events-none z-0" 
+        />
+
+        {/* Layer 2A: Orb behind Top-Right Floating Motivation Engine Card */}
+        <motion.div 
+          animate={
+            prefersReducedMotion
+              ? {}
+              : {
+                  x: [0, -30, 20, 0],
+                  y: [0, 25, -20, 0],
+                  scale: [1, 1.2, 0.95, 1],
+                  opacity: [0.12, 0.22, 0.12]
+                }
+          }
+          transition={{ duration: 15, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-16 right-8 w-72 h-72 bg-[#D4FF00]/20 rounded-full blur-[100px] pointer-events-none z-0"
+        />
+
+        {/* Layer 2B: Orb behind Bottom-Left Floating Community Records Card */}
+        <motion.div 
+          animate={
+            prefersReducedMotion 
+              ? {} 
+              : { 
+                  x: [0, 25, -20, 0],
+                  y: [0, -30, 15, 0],
+                  scale: [0.9, 1.15, 1],
+                  opacity: [0.1, 0.2, 0.1]
+                }
+          }
+          transition={{ duration: 16, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+          className="absolute -bottom-10 right-10 w-96 h-96 bg-[#D4FF00]/12 rounded-full blur-[160px] pointer-events-none z-0" 
+        />
 
         {/* Cinematic Bodybuilder Image with Soft Smudge Feather Mask */}
         <motion.div 
-          animate={{ scale: [1, 1.03, 1] }}
+          animate={prefersReducedMotion ? {} : { scale: [1, 1.03, 1] }}
           transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute inset-0 bg-cover bg-center z-0 opacity-60"
+          className="absolute inset-0 bg-cover bg-center z-0 opacity-60 pointer-events-none"
           style={{ 
             backgroundImage: `url('/assets/hero_bodybuilder.png')`,
             WebkitMaskImage: 'radial-gradient(circle at 45% 50%, rgba(0, 0, 0, 1) 35%, rgba(0, 0, 0, 0) 85%), linear-gradient(to right, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 100%)',
@@ -179,14 +226,33 @@ export default function LoginRegister({ onLogin, apiUrl }) {
           }}
         />
 
+        {/* Layer 3: Ambient Moving Light Rays & Atmosphere Overlay on Left Photo */}
+        <motion.div 
+          animate={
+            prefersReducedMotion 
+              ? {} 
+              : { 
+                  x: ['-15%', '15%', '-15%'], 
+                  y: ['-10%', '10%', '-10%'],
+                  opacity: [0.12, 0.28, 0.12]
+                }
+          }
+          transition={{ duration: 14, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute -inset-10 bg-[radial-gradient(ellipse_at_top_left,_var(--tw-gradient-stops))] from-[#D4FF00]/12 via-transparent to-transparent pointer-events-none z-[2] mix-blend-screen"
+        />
+
         {/* Dark Vignette Atmospheric Smudge Fade */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-[#0A0A0A]/70 z-0 pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0A]/60 via-transparent to-[#0A0A0A] z-0 pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0A] via-transparent to-[#0A0A0A]/70 z-[1] pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0A]/60 via-transparent to-[#0A0A0A] z-[1] pointer-events-none" />
 
         {/* Animated Floating Telemetry Card 1 - Live Motivation Ticker */}
         <motion.div 
           initial={{ y: -30, opacity: 0 }}
-          animate={{ y: [0, -12, 0], opacity: 1 }}
+          animate={
+            prefersReducedMotion
+              ? { opacity: 1, y: 0 }
+              : { y: [0, -12, 0], opacity: 1 }
+          }
           transition={{ y: { duration: 6, repeat: Infinity, ease: 'easeInOut' }, opacity: { duration: 0.8 } }}
           className="absolute top-24 right-12 bg-[#1E1E1E]/90 backdrop-blur-xl border border-[#D4FF00]/40 p-4 rounded-2xl shadow-2xl shadow-black/80 flex items-center gap-3.5 z-20"
         >
@@ -205,7 +271,11 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         {/* Animated Floating Telemetry Card 2 - Heavy Lift Stat Badge */}
         <motion.div 
           initial={{ y: 30, opacity: 0 }}
-          animate={{ y: [0, 14, 0], opacity: 1 }}
+          animate={
+            prefersReducedMotion
+              ? { opacity: 1, y: 0 }
+              : { y: [0, 14, 0], opacity: 1 }
+          }
           transition={{ y: { duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1 }, opacity: { duration: 0.8 } }}
           className="absolute bottom-32 left-12 bg-[#1E1E1E]/90 backdrop-blur-xl border border-[#474747]/50 p-4 rounded-2xl shadow-2xl shadow-black/80 flex items-center gap-3.5 z-20"
         >
@@ -228,9 +298,14 @@ export default function LoginRegister({ onLogin, apiUrl }) {
           <StryvonLogo showTagline={true} />
         </motion.div>
 
+        {/* DeepSeek-Style Ambient SVG Motion Mesh (behind headline) */}
+        <div className="absolute inset-0 flex items-center justify-center z-[3] pointer-events-none opacity-85">
+          <StryvonMotionGraphic />
+        </div>
+
         {/* Center Display Typography & Motivational Tagline */}
         <div className="my-auto z-10 max-w-xl space-y-6">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
@@ -239,26 +314,17 @@ export default function LoginRegister({ onLogin, apiUrl }) {
             <Zap size={14} className="fill-[#D4FF00]" />
             UNLEASH YOUR PEAK POTENTIAL
           </motion.div>
-          
-          <motion.h1 
+
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.7, delay: 0.3 }}
-            className="font-display text-8xl font-black tracking-tight leading-[0.9] uppercase text-white drop-shadow-2xl"
+            className="font-display text-7xl lg:text-8xl font-black tracking-tight leading-[0.9] uppercase text-white drop-shadow-2xl"
           >
             FORGE<br />
             <span className="text-[#D4FF00] drop-shadow-[0_0_25px_rgba(212,255,0,0.5)]">YOUR</span><br />
             LEGACY.
           </motion.h1>
-
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="text-[#E5E5E5]/80 text-sm leading-relaxed max-w-md pt-2 font-medium"
-          >
-            Every set, every rep, every meal recorded brings you closer to your ultimate physique. STRYVON powers your daily performance with high-precision telemetry.
-          </motion.p>
         </div>
 
         {/* Bottom Stats & Motivational Quote Banner */}
@@ -291,18 +357,60 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         </motion.div>
       </div>
 
-      {/* RIGHT COLUMN: Authentication Form Container */}
-      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 lg:p-16 overflow-y-auto bg-[#0A0A0A] relative">
+      {/* RIGHT COLUMN: Authentication Form Container with DeepSeek-style Ambient Glow Drifts */}
+      <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 lg:p-16 overflow-y-auto bg-[#0A0A0A] relative overflow-hidden">
         
-        {/* Glow ambient circle on form side */}
-        <div className="absolute top-1/4 right-1/4 w-80 h-80 bg-[#D4FF00]/5 rounded-full blur-3xl pointer-events-none" />
+        {/* Layer 1 (Deepest): Slow-moving ambient glow/gradient blob behind sign-in form */}
+        <motion.div 
+          animate={
+            prefersReducedMotion 
+              ? {} 
+              : { 
+                  x: [0, 45, -35, 0],
+                  y: [0, -55, 35, 0],
+                  scale: [1, 1.18, 0.88, 1],
+                  opacity: [0.12, 0.22, 0.12]
+                }
+          }
+          transition={{ duration: 19, repeat: Infinity, ease: 'easeInOut' }}
+          className="absolute top-1/4 right-1/4 w-80 sm:w-[28rem] h-80 sm:h-[28rem] bg-[#D4FF00]/15 rounded-full blur-[130px] pointer-events-none z-0" 
+        />
+
+        {/* Layer 2C: Faint Ambient Orb at Bottom-Right of Form Container */}
+        <motion.div 
+          animate={
+            prefersReducedMotion 
+              ? {} 
+              : { 
+                  x: [0, -40, 25, 0],
+                  y: [0, -35, 45, 0],
+                  opacity: [0.06, 0.15, 0.06]
+                }
+          }
+          transition={{ duration: 21, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+          className="absolute bottom-10 right-10 w-64 h-64 bg-[#D4FF00]/10 rounded-full blur-[110px] pointer-events-none z-0" 
+        />
+
+        {/* Mobile Ambient SVG Motion Mesh — floating neon energy ring background for mobile phones */}
+        <div className="lg:hidden absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-40 overflow-hidden scale-75">
+          <StryvonMotionGraphic />
+        </div>
 
         <motion.div 
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.5 }}
-          className="w-full max-w-md space-y-7 my-auto z-10"
+          className="w-full max-w-md space-y-6 sm:space-y-7 my-auto z-10"
         >
+
+          {/* Mobile Header Branding Logo (visible on screen widths < lg) */}
+          <div className="lg:hidden flex items-center justify-between pb-2 border-b border-[#474747]/20">
+            <StryvonLogo showTagline={false} />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#D4FF00]/10 border border-[#D4FF00]/30 text-[#D4FF00] text-[10px] font-black uppercase tracking-widest font-display">
+              <Zap size={12} className="fill-[#D4FF00]" />
+              AI COACH
+            </div>
+          </div>
 
           {/* Mode Switcher */}
           <div className="flex justify-end">
