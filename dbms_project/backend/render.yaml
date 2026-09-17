@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: stryvon-backend
+    env: node
+    plan: free
+    rootDir: dbms_project/backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false

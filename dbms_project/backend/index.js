@@ -102,7 +102,11 @@ app.get('/api/progress/analytics', authMiddleware, getAnalytics);
 app.get('/api/analytics/overview', authMiddleware, getAnalytics);
 app.get('/api/progress/pdf-export', authMiddleware, getPdfReportData);
 
-// Basic health check route
+// Basic health check routes for Render hosting
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'ok', service: 'STRYVON AI Backend API', timestamp: new Date() });
+});
+
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'healthy', timestamp: new Date() });
 });
