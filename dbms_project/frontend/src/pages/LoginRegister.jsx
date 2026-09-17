@@ -319,7 +319,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
               <button
                 type="button"
                 onClick={() => { setIsLogin(true); setError(''); }}
-                className={`py-2.5 px-6 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-300 relative z-10 font-display ${
+                className={`py-2.5 px-5 sm:px-6 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-300 relative z-10 font-display min-h-[44px] flex items-center justify-center ${
                   isLogin 
                     ? 'bg-[#D4FF00] text-[#0A0A0A] shadow-lg shadow-[#D4FF00]/25' 
                     : 'text-[#474747] hover:text-white'
@@ -330,7 +330,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
               <button
                 type="button"
                 onClick={() => { setIsLogin(false); setError(''); }}
-                className={`py-2.5 px-6 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-300 relative z-10 font-display ${
+                className={`py-2.5 px-5 sm:px-6 rounded-xl text-xs font-black tracking-wider uppercase transition-all duration-300 relative z-10 font-display min-h-[44px] flex items-center justify-center ${
                   !isLogin 
                     ? 'bg-[#D4FF00] text-[#0A0A0A] shadow-lg shadow-[#D4FF00]/25' 
                     : 'text-[#474747] hover:text-white'
@@ -343,7 +343,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
 
           {/* Header Title */}
           <div>
-            <h2 className="font-display text-5xl font-black tracking-tight uppercase text-white">
+            <h2 className="font-display text-3xl sm:text-5xl font-black tracking-tight uppercase text-white">
               {isLogin ? 'WELCOME BACK.' : 'JOIN STRYVON.'}
             </h2>
             <p className="text-xs text-[#E5E5E5]/70 mt-1.5 font-semibold">
@@ -406,7 +406,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                       placeholder="Alex Morgan"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 px-4 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00] min-h-[44px]"
                     />
                   </div>
                 )}
@@ -422,7 +422,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                     placeholder="alex@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 px-4 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00]"
+                    className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00] min-h-[44px]"
                   />
                 </div>
 
@@ -449,12 +449,12 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 pl-4 pr-11 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 pl-4 pr-11 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00] min-h-[44px]"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#474747] hover:text-white transition-colors"
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#474747] hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                     >
                       {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
@@ -474,12 +474,12 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                         placeholder="••••••••"
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
-                        className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 pl-4 pr-11 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00]"
+                        className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 pl-4 pr-11 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00] transition-all focus:ring-1 focus:ring-[#D4FF00] min-h-[44px]"
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#474747] hover:text-white transition-colors"
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#474747] hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       >
                         {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
@@ -498,7 +498,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                           placeholder="24"
                           value={age}
                           onChange={(e) => setAge(e.target.value)}
-                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00]"
+                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                         />
                       </div>
                       <div>
@@ -506,7 +506,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                         <select
                           value={gender}
                           onChange={(e) => setGender(e.target.value)}
-                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00]"
+                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                         >
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
@@ -523,7 +523,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                           placeholder="178"
                           value={height}
                           onChange={(e) => setHeight(e.target.value)}
-                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00]"
+                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                         />
                       </div>
                       <div>
@@ -533,7 +533,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                           placeholder="74"
                           value={weight}
                           onChange={(e) => setWeight(e.target.value)}
-                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3.5 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00]"
+                          className="w-full bg-[#1E1E1E] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                         />
                       </div>
                     </div>
@@ -549,7 +549,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
                             whileTap={{ scale: 0.97 }}
                             key={g.id}
                             onClick={() => setGoalType(g.id)}
-                            className={`p-3 rounded-xl text-xs font-bold text-center border transition-all ${
+                            className={`p-3 rounded-xl text-xs font-bold text-center border transition-all min-h-[44px] flex items-center justify-center ${
                               goalType === g.id 
                                 ? 'bg-[#D4FF00]/15 border-[#D4FF00] text-[#D4FF00] shadow-sm shadow-[#D4FF00]/10' 
                                 : 'bg-[#1E1E1E] border-[#474747]/40 text-[#474747] hover:text-white'
@@ -571,7 +571,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
               whileTap={{ scale: 0.98 }}
               type="submit"
               disabled={loading}
-              className="w-full bg-[#D4FF00] hover:bg-[#c2eb00] text-[#0A0A0A] font-extrabold font-display text-xl py-4 rounded-xl shadow-lg shadow-[#D4FF00]/20 transition-all flex items-center justify-center gap-2 uppercase tracking-wider disabled:opacity-50 mt-6 cursor-pointer"
+              className="w-full bg-[#D4FF00] hover:bg-[#c2eb00] text-[#0A0A0A] font-extrabold font-display text-xl py-3.5 rounded-xl shadow-lg shadow-[#D4FF00]/20 transition-all flex items-center justify-center gap-2 uppercase tracking-wider disabled:opacity-50 mt-6 cursor-pointer min-h-[48px]"
             >
               {loading ? (
                 <div className="h-5 w-5 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
@@ -598,7 +598,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
               type="button"
               disabled={loading || googleLoading}
               onClick={handleGoogleSignIn}
-              className="w-full flex items-center justify-center gap-3 bg-[#0A0A0A] hover:bg-[#141414] border border-[#D4FF00]/50 hover:border-[#D4FF00] text-white rounded-xl py-3.5 px-4 text-sm font-bold font-display tracking-wider uppercase transition-all shadow-md cursor-pointer disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-3 bg-[#0A0A0A] hover:bg-[#141414] border border-[#D4FF00]/50 hover:border-[#D4FF00] text-white rounded-xl py-3.5 px-4 text-sm font-bold font-display tracking-wider uppercase transition-all shadow-md cursor-pointer disabled:opacity-50 min-h-[48px]"
             >
               {googleLoading ? (
                 <div className="h-5 w-5 border-2 border-[#D4FF00] border-t-transparent rounded-full animate-spin"></div>

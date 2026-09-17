@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Camera, 
   Plus, 
@@ -13,6 +13,8 @@ import {
   Sparkles,
   Zap
 } from 'lucide-react';
+import CountUp from '../components/CountUp';
+import { tapScaleProps } from '../utils/animationPresets';
 
 export default function Diet({ apiUrl, token, user }) {
   const [mealLogs, setMealLogs] = useState([]);
@@ -280,80 +282,80 @@ export default function Diet({ apiUrl, token, user }) {
     >
       {/* Header */}
       <div>
-        <h1 className="font-display text-4xl font-black text-white tracking-tight uppercase">NUTRITION & DIET TRACKER</h1>
+        <h1 className="font-display text-2xl sm:text-4xl font-black text-white tracking-tight uppercase">NUTRITION & DIET TRACKER</h1>
         <p className="text-[#E5E5E5]/70 text-xs mt-1 font-medium">Log meals manually, track daily water metrics, or scan dishes via camera with AI.</p>
       </div>
 
       {/* Target Progress Bar Rings */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         {/* Calories Ring */}
-        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
-          <span className="text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-4 font-display">Today's Calories</span>
-          <div className="relative inline-flex items-center justify-center h-28 w-28 mx-auto mb-4">
+        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
+          <span className="text-[10px] sm:text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-2 sm:mb-4 font-display">Today's Calories</span>
+          <div className="relative inline-flex items-center justify-center h-20 w-20 sm:h-28 sm:w-28 mx-auto mb-2 sm:mb-4">
             <svg className="w-full h-full transform -rotate-90">
               <circle cx="56" cy="56" r="48" className="stroke-[#0A0A0A] fill-transparent" strokeWidth="8"/>
               <circle cx="56" cy="56" r="48" className="stroke-[#D4FF00] fill-transparent transition-all duration-500" strokeWidth="8" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * calProgress) / 100}/>
             </svg>
             <div className="absolute text-center">
-              <span className="font-display text-3xl font-black text-white">{mealTotals?.total_calories || 0}</span>
-              <p className="text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetCalories} kcal</p>
+              <span className="font-display text-xl sm:text-3xl font-black text-white">{mealTotals?.total_calories || 0}</span>
+              <p className="text-[9px] sm:text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetCalories} kcal</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-[#D4FF00] bg-[#D4FF00]/10 border border-[#D4FF00]/20 px-3 py-1 rounded-full w-fit mx-auto font-display">
+          <span className="text-[10px] sm:text-xs font-bold text-[#D4FF00] bg-[#D4FF00]/10 border border-[#D4FF00]/20 px-2.5 py-1 rounded-full w-fit mx-auto font-display">
             {calProgress}% Complete
           </span>
         </div>
 
         {/* Protein Macro */}
-        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
-          <span className="text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-4 font-display">Protein</span>
-          <div className="relative inline-flex items-center justify-center h-28 w-28 mx-auto mb-4">
+        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
+          <span className="text-[10px] sm:text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-2 sm:mb-4 font-display">Protein</span>
+          <div className="relative inline-flex items-center justify-center h-20 w-20 sm:h-28 sm:w-28 mx-auto mb-2 sm:mb-4">
             <svg className="w-full h-full transform -rotate-90">
               <circle cx="56" cy="56" r="48" className="stroke-[#0A0A0A] fill-transparent" strokeWidth="8"/>
               <circle cx="56" cy="56" r="48" className="stroke-violet-400 fill-transparent transition-all duration-500" strokeWidth="8" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * proteinProgress) / 100}/>
             </svg>
             <div className="absolute text-center">
-              <span className="font-display text-3xl font-black text-white">{mealTotals?.total_protein || 0}g</span>
-              <p className="text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetProtein}g Goal</p>
+              <span className="font-display text-xl sm:text-3xl font-black text-white">{mealTotals?.total_protein || 0}g</span>
+              <p className="text-[9px] sm:text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetProtein}g Goal</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-3 py-1 rounded-full w-fit mx-auto font-display">
+          <span className="text-[10px] sm:text-xs font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2.5 py-1 rounded-full w-fit mx-auto font-display">
             {proteinProgress}% Complete
           </span>
         </div>
 
         {/* Carbs Macro */}
-        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
-          <span className="text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-4 font-display">Carbohydrates</span>
-          <div className="relative inline-flex items-center justify-center h-28 w-28 mx-auto mb-4">
+        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
+          <span className="text-[10px] sm:text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-2 sm:mb-4 font-display">Carbohydrates</span>
+          <div className="relative inline-flex items-center justify-center h-20 w-20 sm:h-28 sm:w-28 mx-auto mb-2 sm:mb-4">
             <svg className="w-full h-full transform -rotate-90">
               <circle cx="56" cy="56" r="48" className="stroke-[#0A0A0A] fill-transparent" strokeWidth="8"/>
               <circle cx="56" cy="56" r="48" className="stroke-sky-400 fill-transparent transition-all duration-500" strokeWidth="8" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * carbsProgress) / 100}/>
             </svg>
             <div className="absolute text-center">
-              <span className="font-display text-3xl font-black text-white">{mealTotals?.total_carbs || 0}g</span>
-              <p className="text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetCarbs}g Goal</p>
+              <span className="font-display text-xl sm:text-3xl font-black text-white">{mealTotals?.total_carbs || 0}g</span>
+              <p className="text-[9px] sm:text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetCarbs}g Goal</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-3 py-1 rounded-full w-fit mx-auto font-display">
+          <span className="text-[10px] sm:text-xs font-bold text-sky-400 bg-sky-500/10 border border-sky-500/20 px-2.5 py-1 rounded-full w-fit mx-auto font-display">
             {carbsProgress}% Complete
           </span>
         </div>
 
         {/* Fats Macro */}
-        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
-          <span className="text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-4 font-display">Healthy Fats</span>
-          <div className="relative inline-flex items-center justify-center h-28 w-28 mx-auto mb-4">
+        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl text-center flex flex-col justify-between shadow-lg">
+          <span className="text-[10px] sm:text-xs font-bold text-[#E5E5E5]/60 uppercase tracking-widest block mb-2 sm:mb-4 font-display">Healthy Fats</span>
+          <div className="relative inline-flex items-center justify-center h-20 w-20 sm:h-28 sm:w-28 mx-auto mb-2 sm:mb-4">
             <svg className="w-full h-full transform -rotate-90">
               <circle cx="56" cy="56" r="48" className="stroke-[#0A0A0A] fill-transparent" strokeWidth="8"/>
               <circle cx="56" cy="56" r="48" className="stroke-orange-400 fill-transparent transition-all duration-500" strokeWidth="8" strokeDasharray="301.6" strokeDashoffset={301.6 - (301.6 * fatsProgress) / 100}/>
             </svg>
             <div className="absolute text-center">
-              <span className="font-display text-3xl font-black text-white">{mealTotals?.total_fats || 0}g</span>
-              <p className="text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetFats}g Goal</p>
+              <span className="font-display text-xl sm:text-3xl font-black text-white">{mealTotals?.total_fats || 0}g</span>
+              <p className="text-[9px] sm:text-[10px] font-semibold text-[#E5E5E5]/50">/ {targetFats}g Goal</p>
             </div>
           </div>
-          <span className="text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-3 py-1 rounded-full w-fit mx-auto font-display">
+          <span className="text-[10px] sm:text-xs font-bold text-orange-400 bg-orange-500/10 border border-orange-500/20 px-2.5 py-1 rounded-full w-fit mx-auto font-display">
             {fatsProgress}% Complete
           </span>
         </div>
@@ -364,30 +366,30 @@ export default function Diet({ apiUrl, token, user }) {
         {/* Left 2 Cols: Meal Logs List & Hydration */}
         <div className="lg:col-span-2 space-y-6">
           {/* Meal log list */}
-          <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl shadow-lg">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg">
+            <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
               <div>
-                <h3 className="font-display text-xl font-bold text-white uppercase tracking-wide">Daily Logged Meals</h3>
+                <h3 className="font-display text-lg sm:text-xl font-bold text-white uppercase tracking-wide">Daily Logged Meals</h3>
                 <p className="text-xs text-[#E5E5E5]/60 mt-0.5">Summary of food records eaten today</p>
               </div>
               <button
                 onClick={() => setShowManualForm(!showManualForm)}
-                className="flex items-center gap-1.5 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-4 py-2 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md"
+                className="flex items-center gap-1.5 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md min-h-[44px]"
               >
-                <Plus size={14} /> Manual Log
+                <Plus size={16} /> Manual Log
               </button>
             </div>
 
             {/* Manual Form (Conditional) */}
             {showManualForm && (
-              <form onSubmit={handleManualMealSubmit} className="bg-[#0A0A0A] border border-[#474747] p-5 rounded-2xl mb-6 space-y-4">
+              <form onSubmit={handleManualMealSubmit} className="bg-[#0A0A0A] border border-[#474747] p-4 sm:p-5 rounded-2xl mb-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs text-[#E5E5E5]/70 block mb-1 font-bold uppercase tracking-wider font-display">Meal Category</label>
                     <select
                       value={mealType}
                       onChange={(e) => setMealType(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2 px-3 text-sm focus:outline-none focus:border-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                     >
                       <option value="Breakfast">Breakfast</option>
                       <option value="Lunch">Lunch</option>
@@ -403,12 +405,12 @@ export default function Diet({ apiUrl, token, user }) {
                       placeholder="e.g. Scrambled eggs with toast"
                       value={mealName}
                       onChange={(e) => setMealName(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2 px-3 text-sm focus:outline-none focus:border-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                     />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                   <div>
                     <label className="text-xs text-[#E5E5E5]/70 block mb-1 font-bold">Calories (kcal)</label>
                     <input
@@ -416,7 +418,7 @@ export default function Diet({ apiUrl, token, user }) {
                       required
                       value={calories}
                       onChange={(e) => setCalories(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                     />
                   </div>
                   <div>
@@ -425,7 +427,7 @@ export default function Diet({ apiUrl, token, user }) {
                       type="number"
                       value={protein}
                       onChange={(e) => setProtein(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                     />
                   </div>
                   <div>
@@ -434,7 +436,7 @@ export default function Diet({ apiUrl, token, user }) {
                       type="number"
                       value={carbs}
                       onChange={(e) => setCarbs(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                     />
                   </div>
                   <div>
@@ -443,7 +445,7 @@ export default function Diet({ apiUrl, token, user }) {
                       type="number"
                       value={fats}
                       onChange={(e) => setFats(e.target.value)}
-                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00]"
+                      className="w-full bg-[#1E1E1E] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm text-center focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                     />
                   </div>
                 </div>
@@ -452,13 +454,13 @@ export default function Diet({ apiUrl, token, user }) {
                   <button
                     type="button"
                     onClick={() => setShowManualForm(false)}
-                    className="px-4 py-2 border border-[#474747] text-[#E5E5E5] text-xs font-semibold rounded-xl hover:bg-[#1E1E1E]"
+                    className="px-4 py-2.5 border border-[#474747] text-[#E5E5E5] text-xs font-semibold rounded-xl hover:bg-[#1E1E1E] min-h-[44px]"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-4 py-2 text-xs uppercase rounded-xl transition-all"
+                    className="bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-4 py-2.5 text-xs uppercase rounded-xl transition-all min-h-[44px]"
                   >
                     Log Item
                   </button>
@@ -469,39 +471,47 @@ export default function Diet({ apiUrl, token, user }) {
             {/* List */}
             {mealLogs.length > 0 ? (
               <div className="space-y-3">
-                {mealLogs.map((meal) => (
-                  <div 
-                    key={meal.meal_id}
-                    className="flex justify-between items-center p-4 rounded-2xl bg-[#0A0A0A] border border-[#474747]/40 hover:border-[#D4FF00]/40 transition-all duration-200"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`px-2.5 py-1 rounded-lg text-xs font-display font-bold uppercase ${meal.meal_type === 'Breakfast' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : meal.meal_type === 'Lunch' ? 'bg-[#D4FF00]/20 text-[#D4FF00] border border-[#D4FF00]/30' : meal.meal_type === 'Dinner' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-pink-500/20 text-pink-400 border border-pink-500/30'}`}>
-                        {meal.meal_type}
-                      </div>
-                      <div>
-                        <span className="font-bold text-white text-sm block">{meal.meal_name}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <span className="font-display font-black text-[#D4FF00] text-base">{meal.calories} kcal</span>
-                        <div className="flex gap-2 text-[11px] text-[#E5E5E5]/60 font-medium mt-0.5">
-                          <span>P: {meal.protein}g</span>
-                          <span>C: {meal.carbs}g</span>
-                          <span>F: {meal.fats}g</span>
+                <AnimatePresence mode="popLayout">
+                  {mealLogs.map((meal) => (
+                    <motion.div 
+                      key={meal.meal_id}
+                      layout
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: -30, height: 0, marginBottom: 0, padding: 0 }}
+                      transition={{ duration: 0.25, ease: 'easeInOut' }}
+                      className="flex justify-between items-center p-3.5 sm:p-4 rounded-2xl bg-[#0A0A0A] border border-[#474747]/40 hover:border-[#D4FF00]/40 transition-all duration-200"
+                    >
+                      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+                        <div className={`shrink-0 px-2 py-1 rounded-lg text-[10px] sm:text-xs font-display font-bold uppercase ${meal.meal_type === 'Breakfast' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : meal.meal_type === 'Lunch' ? 'bg-[#D4FF00]/20 text-[#D4FF00] border border-[#D4FF00]/30' : meal.meal_type === 'Dinner' ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30' : 'bg-pink-500/20 text-pink-400 border border-pink-500/30'}`}>
+                          {meal.meal_type}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="font-bold text-white text-xs sm:text-sm block truncate">{meal.meal_name}</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteMeal(meal.meal_id)}
-                        className="text-[#474747] hover:text-red-400 p-1.5 transition-colors"
-                        title="Delete meal"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                      
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="font-display font-black text-[#D4FF00] text-sm sm:text-base">{meal.calories} kcal</span>
+                          <div className="flex gap-1.5 text-[10px] sm:text-[11px] text-[#E5E5E5]/60 font-medium mt-0.5">
+                            <span>P: {meal.protein}g</span>
+                            <span>C: {meal.carbs}g</span>
+                            <span>F: {meal.fats}g</span>
+                          </div>
+                        </div>
+                        <motion.button
+                          whileTap={{ scale: 0.88 }}
+                          onClick={() => handleDeleteMeal(meal.meal_id)}
+                          className="text-[#474747] hover:text-red-400 min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors rounded-lg cursor-pointer"
+                          title="Delete meal"
+                        >
+                          <Trash2 size={16} />
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             ) : (
               <div className="text-center py-10 text-[#E5E5E5]/40 text-sm">
@@ -512,10 +522,10 @@ export default function Diet({ apiUrl, token, user }) {
           </div>
 
           {/* Hydration tracking card */}
-          <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl shadow-lg">
+          <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg">
             <div className="flex justify-between items-center mb-4">
               <div>
-                <h3 className="font-display text-xl font-bold text-white uppercase tracking-wide">Water Hydration Tracker</h3>
+                <h3 className="font-display text-lg sm:text-xl font-bold text-white uppercase tracking-wide">Water Hydration Tracker</h3>
                 <p className="text-xs text-[#E5E5E5]/60 mt-0.5">Track daily fluid intake towards your target</p>
               </div>
               <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-2xl border border-sky-500/20">
@@ -525,19 +535,19 @@ export default function Diet({ apiUrl, token, user }) {
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
               <div className="text-center sm:text-left">
-                <span className="text-3xl font-display font-black text-white">{waterLogged}</span>
-                <span className="text-sm font-semibold text-[#E5E5E5]/60"> ml logged today</span>
+                <span className="text-2xl sm:text-3xl font-display font-black text-white">{waterLogged}</span>
+                <span className="text-xs sm:text-sm font-semibold text-[#E5E5E5]/60"> ml logged today</span>
               </div>
               <div className="flex gap-3 w-full sm:w-auto">
                 <button
                   onClick={() => handleLogWater(250)}
-                  className="flex-1 sm:flex-initial bg-[#0A0A0A] hover:bg-[#151515] border border-sky-500/30 text-sky-400 font-display font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all"
+                  className="flex-1 sm:flex-initial bg-[#0A0A0A] hover:bg-[#151515] border border-sky-500/30 text-sky-400 font-display font-bold px-4 py-3 rounded-xl text-xs uppercase tracking-wider transition-all min-h-[44px]"
                 >
                   + 250ml
                 </button>
                 <button
                   onClick={() => handleLogWater(500)}
-                  className="flex-1 sm:flex-initial bg-sky-500 hover:bg-sky-400 text-black font-display font-bold px-4 py-2.5 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md"
+                  className="flex-1 sm:flex-initial bg-sky-500 hover:bg-sky-400 text-black font-display font-bold px-4 py-3 rounded-xl text-xs uppercase tracking-wider transition-all shadow-md min-h-[44px]"
                 >
                   + 500ml
                 </button>

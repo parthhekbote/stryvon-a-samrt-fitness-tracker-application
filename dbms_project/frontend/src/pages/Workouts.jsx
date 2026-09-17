@@ -44,6 +44,8 @@ export default function Workouts({ apiUrl, token }) {
   const [showSwapModal, setShowSwapModal] = useState(false);
   const [showProgramModal, setShowProgramModal] = useState(false);
   const [showFreestyleModal, setShowFreestyleModal] = useState(false);
+  const [showAddExPicker, setShowAddExPicker] = useState(false);
+  const [customExInput, setCustomExInput] = useState('');
 
   // Freestyle Workout Selection State
   const [freestyleSelectedExs, setFreestyleSelectedExs] = useState([]);
@@ -51,7 +53,7 @@ export default function Workouts({ apiUrl, token }) {
 
   // Program Creation Wizard State
   const [progName, setProgName] = useState('');
-  const [progMode, setProgMode] = useState('rotating'); // 'rotating' | 'fixed'
+  const [progMode, setProgMode] = useState('fixed'); // 'fixed' | 'rotating'
   const [progIsActive, setProgIsActive] = useState(true);
   const [progDays, setProgDays] = useState([
     { name: 'Push Day', muscle_groups: ['chest', 'shoulders', 'triceps'], fixed_weekday: 'Monday', workout_id: null },
@@ -155,9 +157,44 @@ export default function Workouts({ apiUrl, token }) {
         if (res.ok) exerciseList = data.exercises || [];
       }
 
-      // Default fallback exercises if empty
+      // Match exercises by muscle groups or day name if empty
       if (!exerciseList || exerciseList.length === 0) {
-        exerciseList = exercises.slice(0, 3);
+        const targetTags = new Set();
+        if (workoutDay.muscle_groups && Array.isArray(workoutDay.muscle_groups)) {
+          workoutDay.muscle_groups.forEach(m => targetTags.add(m.toLowerCase()));
+        }
+        
+        const dayNameLower = (workoutDay.name || '').toLowerCase();
+        if (dayNameLower.includes('push')) { ['chest', 'shoulders', 'triceps'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('pull')) { ['back', 'biceps'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('leg')) { ['legs', 'quads', 'glutes', 'hamstrings', 'calves'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('abs') || dayNameLower.includes('core')) { ['abs', 'core'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('chest')) { targetTags.add('chest'); }
+        if (dayNameLower.includes('shoulder')) { targetTags.add('shoulders'); }
+        if (dayNameLower.includes('arm')) { ['biceps', 'triceps'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('cardio')) { targetTags.add('cardio'); }
+
+        const tagsArr = Array.from(targetTags);
+
+        if (tagsArr.length > 0) {
+          const matchedExs = exercises.filter(ex => {
+            const exMg = (ex.muscle_group || '').toLowerCase();
+            const exMgs = (ex.muscle_groups || []).map(m => m.toLowerCase());
+            return tagsArr.some(t => exMg.includes(t) || t.includes(exMg) || exMgs.some(m => m.includes(t)));
+          });
+          if (matchedExs.length > 0) {
+            exerciseList = matchedExs;
+          }
+        }
+
+        if (!exerciseList || exerciseList.length === 0) {
+          exerciseList = exercises.slice(0, 4);
+        }
+      }
+
+      // Limit to max 4 exercises per session
+      if (exerciseList && exerciseList.length > 4) {
+        exerciseList = exerciseList.slice(0, 4);
       }
 
       const initialChecked = {};
@@ -321,6 +358,16 @@ export default function Workouts({ apiUrl, token }) {
     setCheckedExercises(nextChecked);
   };
 
+  // Remove Exercise from Session Checklist
+  const handleRemoveExerciseFromSession = (exerciseName) => {
+    setLogExercises(prev => prev.filter(ex => ex.exercise_name !== exerciseName));
+    setCheckedExercises(prev => {
+      const updated = { ...prev };
+      delete updated[exerciseName];
+      return updated;
+    });
+  };
+
   // Submit Completed Workout Checklist
   const handleSubmitLog = async (e) => {
     e.preventDefault();
@@ -342,6 +389,7 @@ export default function Workouts({ apiUrl, token }) {
         body: JSON.stringify({
           workout_id: selectedWorkout?.workout_id || null,
           workout_day_id: currentWorkoutDayRef,
+          custom_name: selectedWorkout?.workout_name || null,
           is_custom: isCustomSession,
           muscle_groups: customMuscleTags,
           duration: parseInt(logDuration),
@@ -412,6 +460,8 @@ export default function Workouts({ apiUrl, token }) {
   const suggestedDay = suggestedData?.suggested;
   const activeProgram = suggestedData?.program;
 
+  const todayWeekdayName = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 15 }}
@@ -420,41 +470,32 @@ export default function Workouts({ apiUrl, token }) {
       className="space-y-6 relative"
     >
       {/* Header & Navigation */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-[#474747]/30 pb-4">
         <div>
-          <h1 className="text-3xl font-bold text-white font-display uppercase tracking-wide">WORKOUT SESSION MANAGER</h1>
-          <p className="text-slate-400 text-sm mt-1">Lightweight workout checklist & scheduling.</p>
+          <h1 className="text-3xl font-bold text-white font-display uppercase tracking-wide">WORKOUTS</h1>
+          <p className="text-slate-400 text-sm mt-0.5">Your daily workout routine schedule.</p>
         </div>
-        <div className="flex flex-wrap gap-2 bg-[#1E1E1E] p-1.5 rounded-2xl border border-[#474747]/40">
+        <div className="flex flex-wrap items-center gap-2 bg-[#1E1E1E] p-1.5 rounded-2xl border border-[#474747]/40 w-full sm:w-auto">
           <button
             onClick={() => setActiveTab('templates')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'templates' ? 'bg-[#D4FF00] text-black shadow-md' : 'text-[#E5E5E5] hover:text-white'}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider transition-all cursor-pointer min-h-[44px] ${activeTab === 'templates' ? 'bg-[#D4FF00] text-black shadow-md' : 'text-[#E5E5E5] hover:text-white'}`}
           >
             <Calendar size={15} />
-            Today's Schedule
+            Today's Workout
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider transition-all cursor-pointer ${activeTab === 'history' ? 'bg-[#D4FF00] text-black shadow-md' : 'text-[#E5E5E5] hover:text-white'}`}
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider transition-all cursor-pointer min-h-[44px] ${activeTab === 'history' ? 'bg-[#D4FF00] text-black shadow-md' : 'text-[#E5E5E5] hover:text-white'}`}
           >
             <History size={15} />
             History Log
           </button>
-
-          <button
-            onClick={() => setShowFreestyleModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 border border-purple-500/40 cursor-pointer transition-all"
-          >
-            <Sparkles size={14} />
-            + Freestyle
-          </button>
-
           <button
             onClick={() => setShowProgramModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider bg-[#0A0A0A] hover:bg-[#262626] text-[#D4FF00] border border-[#D4FF00]/40 cursor-pointer transition-all"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider bg-[#0A0A0A] hover:bg-[#262626] text-[#D4FF00] border border-[#D4FF00]/40 cursor-pointer transition-all min-h-[44px]"
           >
-            <Layers size={14} />
-            + Program
+            <Plus size={15} />
+            + Routine
           </button>
         </div>
       </div>
@@ -463,53 +504,42 @@ export default function Workouts({ apiUrl, token }) {
       {activeTab === 'templates' && (
         <div className="space-y-6">
 
-          {/* Today's Suggested Workout Prominent Card */}
+          {/* Today's Workout Main Card */}
           {suggestedData?.isRestDay ? (
             <motion.div 
               initial={{ scale: 0.98, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-gradient-to-br from-[#1E1E1E] via-[#1E1E1E] to-[#0A0A0A] border-2 border-emerald-500/40 p-7 rounded-3xl shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
+              className="bg-[#1E1E1E] border border-emerald-500/40 p-8 rounded-3xl shadow-lg flex flex-col md:flex-row justify-between items-start md:items-center gap-6"
             >
-              <div className="space-y-1.5">
-                <span className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider font-display bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/30">
-                  PROGRAM: {activeProgram?.program_name || 'Fixed Schedule'}
+              <div className="space-y-2">
+                <span className="text-xs font-extrabold text-emerald-400 uppercase tracking-wider font-display bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/30">
+                  TODAY — {todayWeekdayName.toUpperCase()}
                 </span>
                 <h2 className="font-display text-3xl font-extrabold text-white uppercase tracking-wide">
-                  REST DAY — NO WORKOUT SCHEDULED TODAY
+                  REST DAY
                 </h2>
-                <p className="text-xs text-[#474747] font-semibold">
-                  Today ({new Date().toLocaleDateString('en-US', { weekday: 'long' })}) is a scheduled rest day in your fixed program.
+                <p className="text-xs text-slate-400 font-medium">
+                  No workout assigned for {todayWeekdayName}. Take time to recover or start any routine day below.
                 </p>
               </div>
-
-              <button
-                type="button"
-                onClick={() => setShowSwapModal(true)}
-                className="bg-[#D4FF00] hover:bg-[#c2eb00] text-black font-extrabold font-display px-6 py-3.5 rounded-2xl shadow-lg text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all whitespace-nowrap"
-              >
-                <Shuffle size={16} />
-                Do something else today
-              </button>
             </motion.div>
           ) : suggestedDay ? (
             <motion.div 
               initial={{ scale: 0.98, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="bg-gradient-to-br from-[#1E1E1E] via-[#1E1E1E] to-[#0A0A0A] border-2 border-[#D4FF00]/60 p-7 rounded-3xl shadow-[0_0_35px_rgba(212,255,0,0.15)] relative overflow-hidden"
+              className="bg-gradient-to-br from-[#1E1E1E] via-[#1E1E1E] to-[#0A0A0A] border-2 border-[#D4FF00]/60 p-8 rounded-3xl shadow-[0_0_35px_rgba(212,255,0,0.12)] relative overflow-hidden"
             >
-              <div className="absolute top-0 right-0 bg-[#D4FF00] text-black text-[10px] font-black font-display px-4 py-1.5 rounded-bl-2xl uppercase tracking-widest">
-                TODAY'S SUGGESTED WORKOUT
-              </div>
-
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-extrabold text-[#D4FF00] uppercase tracking-wider font-display bg-[#D4FF00]/10 px-2.5 py-1 rounded-lg border border-[#D4FF00]/30">
-                      PROGRAM: {activeProgram?.program_name || 'Active Schedule'}
+                    <span className="text-xs font-extrabold text-[#D4FF00] uppercase tracking-wider font-display bg-[#D4FF00]/10 px-3 py-1 rounded-lg border border-[#D4FF00]/30">
+                      TODAY — {todayWeekdayName.toUpperCase()}
                     </span>
-                    <span className="text-xs font-bold text-[#474747] uppercase tracking-wider font-display">
-                      {activeProgram?.schedule_mode === 'fixed' ? `Fixed Mode (${suggestedDay.fixed_weekday})` : 'Rotating Sequence'}
-                    </span>
+                    {activeProgram?.program_name && (
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider font-display">
+                        ({activeProgram.program_name})
+                      </span>
+                    )}
                   </div>
 
                   <h2 className="font-display text-4xl font-extrabold text-white uppercase tracking-wide">
@@ -517,103 +547,128 @@ export default function Workouts({ apiUrl, token }) {
                   </h2>
 
                   {/* Muscle Groups tags */}
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {suggestedDay.muscle_groups && suggestedDay.muscle_groups.map((mg, i) => (
-                      <span key={i} className="text-[11px] font-bold uppercase tracking-wider font-display px-2.5 py-1 rounded-md bg-[#0A0A0A] text-[#E5E5E5] border border-[#474747]/40">
-                        {mg}
-                      </span>
-                    ))}
-                  </div>
+                  {suggestedDay.muscle_groups && suggestedDay.muscle_groups.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {suggestedDay.muscle_groups.map((mg, i) => (
+                        <span key={i} className="text-xs font-bold uppercase tracking-wider font-display px-3 py-1 rounded-lg bg-[#0A0A0A] text-[#E5E5E5] border border-[#474747]/50">
+                          {mg}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+                <div className="w-full md:w-auto">
                   <motion.button
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => handleStartWorkoutDay(suggestedDay)}
-                    className="bg-[#D4FF00] hover:bg-[#c2eb00] text-[#0A0A0A] font-extrabold font-display px-6 py-4 rounded-2xl shadow-xl shadow-[#D4FF00]/25 text-base uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
+                    className="w-full md:w-auto bg-[#D4FF00] hover:bg-[#c2eb00] text-[#0A0A0A] font-extrabold font-display px-8 py-4 rounded-2xl shadow-xl shadow-[#D4FF00]/25 text-base uppercase tracking-wider flex items-center justify-center gap-3 cursor-pointer"
                   >
-                    <Play size={18} className="fill-[#0A0A0A]" />
-                    START SUGGESTED WORKOUT
+                    <Play size={20} className="fill-[#0A0A0A]" />
+                    START TODAY'S WORKOUT
                   </motion.button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowSwapModal(true)}
-                    className="bg-[#0A0A0A] hover:bg-[#262626] text-[#E5E5E5] hover:text-white border border-[#474747]/50 font-bold font-display px-4 py-4 rounded-2xl text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all"
-                  >
-                    <Shuffle size={16} className="text-[#D4FF00]" />
-                    Do something else today
-                  </button>
                 </div>
               </div>
             </motion.div>
           ) : (
-            <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl text-center space-y-3">
-              <h3 className="font-display text-xl font-bold text-white uppercase">No Active Workout Program</h3>
-              <p className="text-xs text-[#474747] font-semibold">Create or activate a program to enable day-based rotating scheduling.</p>
+            <div className="bg-[#1E1E1E] border border-[#474747]/40 p-8 rounded-3xl text-center space-y-3">
+              <h3 className="font-display text-xl font-bold text-white uppercase">No Workout Routine Set</h3>
+              <p className="text-xs text-slate-400 font-medium">Add a routine to automatically see your daily workouts.</p>
               <button
                 onClick={() => setShowProgramModal(true)}
-                className="bg-[#D4FF00] text-black px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider font-display inline-flex items-center gap-2 cursor-pointer"
+                className="bg-[#D4FF00] text-black px-5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider font-display inline-flex items-center gap-2 cursor-pointer mt-2"
               >
-                <Plus size={16} /> Create Workout Program
+                <Plus size={16} /> + Add Workout Routine
               </button>
             </div>
           )}
 
-          {/* Standard Routines & Preset List */}
-          <div className="space-y-4">
-            <h3 className="font-display text-xl font-bold text-white uppercase tracking-wide">ROUTINE TEMPLATES LIBRARY</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {workouts.map((workout) => (
-                <motion.div 
-                  whileHover={{ y: -4 }}
-                  key={workout.workout_id} 
-                  className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl shadow-lg flex flex-col justify-between hover:border-[#D4FF00]/40 transition-all group"
-                >
-                  <div>
-                    <div className="flex justify-between items-start mb-4">
-                      <h3 className="font-display text-2xl font-bold text-white group-hover:text-[#D4FF00] transition-colors">{workout.workout_name}</h3>
-                      <span className={`font-display text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider ${workout.difficulty === 'Beginner' ? 'bg-[#D4FF00]/15 text-[#D4FF00]' : workout.difficulty === 'Intermediate' ? 'bg-amber-500/15 text-amber-400' : 'bg-rose-500/15 text-rose-400'}`}>
-                        {workout.difficulty}
-                      </span>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-4 mb-6">
-                      <div className="bg-[#0A0A0A] p-3 rounded-2xl border border-[#474747]/30 text-center">
-                        <Clock size={16} className="mx-auto mb-1 text-[#474747]" />
-                        <span className="text-[10px] text-[#474747] uppercase font-bold tracking-wider font-display">Duration</span>
-                        <p className="text-sm font-extrabold text-[#E5E5E5]">{workout.duration}m</p>
+          {/* Routine Days / Weekly Overview */}
+          {suggestedData?.allDays && suggestedData.allDays.length > 0 && (
+            <div className="space-y-4 pt-2">
+              <div className="flex justify-between items-center">
+                <h3 className="font-display text-lg font-bold text-white uppercase tracking-wide">ROUTINE DAYS</h3>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {suggestedData.allDays.map((day) => {
+                  const isTodayDay = suggestedDay?.workout_day_id === day.workout_day_id;
+                  return (
+                    <div 
+                      key={day.workout_day_id}
+                      className={`p-5 rounded-2xl border transition-all flex flex-col justify-between space-y-4 ${
+                        isTodayDay 
+                          ? 'bg-[#1E1E1E] border-[#D4FF00] shadow-md' 
+                          : 'bg-[#1E1E1E] border-[#474747]/40 hover:border-[#474747]'
+                      }`}
+                    >
+                      <div>
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-[10px] font-extrabold uppercase tracking-wider font-display text-slate-400">
+                            {day.fixed_weekday || `Day ${day.order_index}`}
+                          </span>
+                          {isTodayDay && (
+                            <span className="text-[10px] font-black uppercase tracking-wider font-display bg-[#D4FF00] text-black px-2 py-0.5 rounded">
+                              TODAY
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="font-display text-xl font-extrabold text-white uppercase">{day.name}</h4>
+                        {day.muscle_groups && day.muscle_groups.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {day.muscle_groups.map((mg, i) => (
+                              <span key={i} className="text-[10px] font-bold uppercase tracking-wider font-display px-2 py-0.5 rounded bg-[#0A0A0A] text-slate-300 border border-[#474747]/30">
+                                {mg}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div className="bg-[#0A0A0A] p-3 rounded-2xl border border-[#474747]/30 text-center">
-                        <Flame size={16} className="mx-auto mb-1 text-[#D4FF00]" />
-                        <span className="text-[10px] text-[#474747] uppercase font-bold tracking-wider font-display">Est Burn</span>
-                        <p className="text-sm font-extrabold text-[#E5E5E5]">{workout.calories_burned} kcal</p>
-                      </div>
-                      <div className="bg-[#0A0A0A] p-3 rounded-2xl border border-[#474747]/30 text-center">
-                        <Dumbbell size={16} className="mx-auto mb-1 text-[#474747]" />
-                        <span className="text-[10px] text-[#474747] uppercase font-bold tracking-wider font-display">Equipment</span>
-                        <p className="text-xs font-extrabold text-[#E5E5E5] truncate">{workout.equipment_needed}</p>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="flex justify-between items-center pt-4 border-t border-[#474747]/30">
-                    <span className="text-xs font-bold text-[#474747] font-display tracking-wider uppercase">
-                      {workout.exercise_count || 0} EXERCISES
-                    </span>
+                      <button
+                        onClick={() => handleStartWorkoutDay(day)}
+                        className={`w-full py-2.5 rounded-xl font-bold font-display text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                          isTodayDay 
+                            ? 'bg-[#D4FF00] hover:bg-[#c2eb00] text-black' 
+                            : 'bg-[#0A0A0A] hover:bg-[#262626] text-white border border-[#474747]/40'
+                        }`}
+                      >
+                        <Play size={14} className={isTodayDay ? 'fill-black' : 'fill-white'} />
+                        Start Session
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Standard Templates (if user has custom library) */}
+          {workouts && workouts.length > 0 && (!suggestedData?.allDays || suggestedData.allDays.length === 0) && (
+            <div className="space-y-4 pt-2">
+              <h3 className="font-display text-lg font-bold text-white uppercase tracking-wide">TEMPLATES LIBRARY</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {workouts.map((workout) => (
+                  <div 
+                    key={workout.workout_id} 
+                    className="bg-[#1E1E1E] border border-[#474747]/40 p-5 rounded-2xl flex justify-between items-center"
+                  >
+                    <div>
+                      <h4 className="font-display text-lg font-bold text-white uppercase">{workout.workout_name}</h4>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5">{workout.duration} mins • {workout.calories_burned} kcal</p>
+                    </div>
                     <button
                       onClick={() => handleStartLog(workout)}
-                      className="flex items-center gap-2 bg-[#D4FF00] hover:bg-[#c2eb00] text-[#0A0A0A] font-extrabold font-display px-5 py-2.5 rounded-xl shadow-lg shadow-[#D4FF00]/20 transition-all text-xs uppercase tracking-wider cursor-pointer"
+                      className="bg-[#D4FF00] hover:bg-[#c2eb00] text-black font-extrabold font-display px-4 py-2 rounded-xl text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
                     >
-                      <Play size={14} className="fill-[#0A0A0A]" />
-                      START ROUTINE
+                      <Play size={14} className="fill-black" />
+                      Start
                     </button>
                   </div>
-                </motion.div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
@@ -623,7 +678,16 @@ export default function Workouts({ apiUrl, token }) {
           <div className="flex justify-between items-center pb-4 border-b border-[#474747]/30">
             <div>
               <span className="text-xs text-[#D4FF00] font-bold uppercase tracking-wider font-display">ACTIVE CHECKLIST SESSION</span>
-              <h2 className="font-display text-3xl font-bold text-white uppercase">{selectedWorkout.workout_name}</h2>
+              <div className="mt-1">
+                <input
+                  type="text"
+                  value={selectedWorkout.workout_name || ''}
+                  onChange={(e) => setSelectedWorkout(prev => ({ ...prev, workout_name: e.target.value }))}
+                  className="font-display text-2xl sm:text-3xl font-extrabold text-white uppercase bg-transparent border-b-2 border-transparent hover:border-[#D4FF00]/40 focus:border-[#D4FF00] focus:outline-none transition-all py-0.5 w-full"
+                  placeholder="WORKOUT NAME"
+                  title="Click to edit workout name"
+                />
+              </div>
               {customMuscleTags.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {customMuscleTags.map((tag, tIdx) => (
@@ -643,29 +707,7 @@ export default function Workouts({ apiUrl, token }) {
             </button>
           </div>
 
-          {/* Time & Calorie inputs */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs text-[#474747] block mb-1.5 font-bold uppercase tracking-wider font-display">Duration (Minutes)</label>
-              <input
-                type="number"
-                required
-                value={logDuration}
-                onChange={(e) => setLogDuration(e.target.value)}
-                className="w-full bg-[#0A0A0A] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] focus:outline-none focus:border-[#D4FF00]"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-[#474747] block mb-1.5 font-bold uppercase tracking-wider font-display">Calories Burned (kcal)</label>
-              <input
-                type="number"
-                value={logCalories}
-                onChange={(e) => setLogCalories(e.target.value)}
-                placeholder="Auto-calculated"
-                className="w-full bg-[#0A0A0A] border border-[#474747]/50 rounded-xl py-3 px-4 text-sm text-[#E5E5E5] placeholder:text-[#474747] focus:outline-none focus:border-[#D4FF00]"
-              />
-            </div>
-          </div>
+
 
           {/* Exercise Checklist */}
           <div className="space-y-4">
@@ -691,33 +733,168 @@ export default function Workouts({ apiUrl, token }) {
             </div>
 
             <div className="space-y-2.5">
-              {logExercises.map((ex, exIdx) => {
-                const isChecked = checkedExercises[ex.exercise_name] !== false;
-                return (
-                  <div
-                    key={exIdx}
-                    onClick={() => handleToggleExerciseCheck(ex.exercise_name)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                      isChecked 
-                        ? 'bg-[#D4FF00]/10 border-[#D4FF00]/50 text-white shadow-sm' 
-                        : 'bg-[#0A0A0A] border-[#474747]/40 text-[#474747] opacity-60'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-1 rounded-lg transition-colors ${isChecked ? 'bg-[#D4FF00] text-black' : 'bg-[#1E1E1E] text-[#474747] border border-[#474747]/50'}`}>
-                        {isChecked ? <Check size={18} strokeWidth={3} /> : <Square size={18} />}
+              <AnimatePresence mode="popLayout">
+                {logExercises.map((ex, exIdx) => {
+                  const isChecked = checkedExercises[ex.exercise_name] !== false;
+                  return (
+                    <motion.div
+                      key={ex.exercise_name || exIdx}
+                      layout
+                      initial={{ opacity: 0, y: 8, scale: 0.98 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: -30, height: 0, marginBottom: 0, padding: 0 }}
+                      transition={{ duration: 0.22, ease: 'easeInOut' }}
+                      onClick={() => handleToggleExerciseCheck(ex.exercise_name)}
+                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isChecked 
+                          ? 'bg-[#D4FF00]/10 border-[#D4FF00]/50 text-white shadow-sm' 
+                          : 'bg-[#0A0A0A] border-[#474747]/40 text-[#474747] opacity-60'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className={`p-1.5 rounded-lg shrink-0 transition-colors flex items-center justify-center min-h-[36px] min-w-[36px] ${isChecked ? 'bg-[#D4FF00] text-black' : 'bg-[#1E1E1E] text-[#474747] border border-[#474747]/50'}`}>
+                          <motion.div
+                            key={isChecked ? 'check' : 'uncheck'}
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: [1.25, 1], opacity: 1 }}
+                            transition={{ type: 'spring', stiffness: 450, damping: 25 }}
+                          >
+                            {isChecked ? <Check size={18} strokeWidth={3} /> : <Square size={18} />}
+                          </motion.div>
+                        </div>
+                        <span className={`font-extrabold text-sm sm:text-base font-display truncate ${isChecked ? 'text-white' : 'text-[#474747] line-through'}`}>
+                          {ex.exercise_name}
+                        </span>
                       </div>
-                      <span className={`font-extrabold text-base font-display ${isChecked ? 'text-white' : 'text-[#474747] line-through'}`}>
-                        {ex.exercise_name}
-                      </span>
-                    </div>
 
-                    <span className={`text-xs font-bold font-display uppercase tracking-wider ${isChecked ? 'text-[#D4FF00]' : 'text-[#474747]'}`}>
-                      {isChecked ? 'COMPLETED ✓' : 'SKIPPED'}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[10px] sm:text-xs font-bold font-display uppercase tracking-wider ${isChecked ? 'text-[#D4FF00]' : 'text-[#474747]'}`}>
+                          {isChecked ? 'DONE ✓' : 'SKIPPED'}
+                        </span>
+                        <motion.button
+                          whileTap={{ scale: 0.88 }}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRemoveExerciseFromSession(ex.exercise_name);
+                          }}
+                          className="text-slate-500 hover:text-rose-400 p-2.5 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
+                          title="Delete exercise from session"
+                        >
+                          <Trash2 size={16} />
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
+            </div>
+
+            {/* Add More Exercises Button & Picker */}
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddExPicker(!showAddExPicker)}
+                className="w-full py-3 rounded-2xl border border-dashed border-[#D4FF00]/50 bg-[#D4FF00]/10 hover:bg-[#D4FF00]/20 text-[#D4FF00] font-bold font-display text-xs uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer transition-all"
+              >
+                <Plus size={16} /> + Add More Exercises to Session
+              </button>
+
+              {showAddExPicker && (
+                <div className="mt-3 bg-[#0A0A0A] border border-[#474747]/40 p-4 rounded-2xl space-y-3">
+                  <div className="flex justify-between items-center pb-2 border-b border-[#474747]/30">
+                    <span className="text-xs font-bold text-white font-display uppercase tracking-wider">
+                      Add Exercise to Checklist
                     </span>
+                    <button 
+                      type="button" 
+                      onClick={() => setShowAddExPicker(false)}
+                      className="text-xs text-slate-400 hover:text-white cursor-pointer font-bold font-display uppercase"
+                    >
+                      Close
+                    </button>
                   </div>
-                );
-              })}
+
+                  {/* Add Custom Exercise Input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="Type custom exercise name..."
+                      value={customExInput}
+                      onChange={(e) => setCustomExInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (customExInput.trim()) {
+                            const name = customExInput.trim();
+                            if (!logExercises.some(ex => ex.exercise_name.toLowerCase() === name.toLowerCase())) {
+                              const newEx = { exercise_id: Date.now(), exercise_name: name, muscle_group: customMuscleTags[0] || 'Custom' };
+                              setLogExercises(prev => [...prev, newEx]);
+                              setCheckedExercises(prev => ({ ...prev, [name]: true }));
+                            }
+                            setCustomExInput('');
+                          }
+                        }
+                      }}
+                      className="flex-1 bg-[#1E1E1E] border border-[#474747]/40 rounded-xl px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#D4FF00]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (customExInput.trim()) {
+                          const name = customExInput.trim();
+                          if (!logExercises.some(ex => ex.exercise_name.toLowerCase() === name.toLowerCase())) {
+                            const newEx = { exercise_id: Date.now(), exercise_name: name, muscle_group: customMuscleTags[0] || 'Custom' };
+                            setLogExercises(prev => [...prev, newEx]);
+                            setCheckedExercises(prev => ({ ...prev, [name]: true }));
+                          }
+                          setCustomExInput('');
+                        }
+                      }}
+                      className="bg-[#D4FF00] hover:bg-[#c2eb00] text-black font-extrabold font-display text-xs px-4 py-2 rounded-xl uppercase tracking-wider cursor-pointer"
+                    >
+                      + Add
+                    </button>
+                  </div>
+
+                  {/* Catalog Exercises List sorted by target muscle match */}
+                  <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 pt-1">
+                    {[...exercises].sort((a, b) => {
+                      const targetTagArr = (customMuscleTags || []).map(t => t.toLowerCase());
+                      const aMatch = targetTagArr.some(t => (a.muscle_group || '').toLowerCase().includes(t));
+                      const bMatch = targetTagArr.some(t => (b.muscle_group || '').toLowerCase().includes(t));
+                      if (aMatch && !bMatch) return -1;
+                      if (!aMatch && bMatch) return 1;
+                      return 0;
+                    }).map(ex => {
+                      const alreadyAdded = logExercises.some(e => e.exercise_name === ex.exercise_name);
+                      return (
+                        <div
+                          key={ex.exercise_id}
+                          onClick={() => {
+                            if (!alreadyAdded) {
+                              setLogExercises(prev => [...prev, ex]);
+                              setCheckedExercises(prev => ({ ...prev, [ex.exercise_name]: true }));
+                            }
+                          }}
+                          className={`p-3 rounded-xl text-xs font-bold font-display flex justify-between items-center transition-all ${
+                            alreadyAdded 
+                              ? 'bg-[#1E1E1E] text-slate-500 cursor-not-allowed opacity-50' 
+                              : 'bg-[#1E1E1E] hover:bg-[#262626] text-white border border-[#474747]/30 cursor-pointer'
+                          }`}
+                        >
+                          <span>{ex.exercise_name} <span className="text-[10px] text-slate-400">({ex.muscle_group})</span></span>
+                          {alreadyAdded ? (
+                            <span className="text-[10px] text-slate-500 uppercase">In Session ✓</span>
+                          ) : (
+                            <span className="text-xs text-[#D4FF00] font-extrabold uppercase">+ Add</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

@@ -111,11 +111,9 @@ export async function getWorkoutExercises(req, res) {
 
 export async function logWorkoutCompletion(req, res) {
   const userId = req.user.userId;
-  const { workout_id, workout_day_id, is_custom, muscle_groups, duration, calories_burned, sets, completed_exercises } = req.body;
+  const { workout_id, workout_day_id, custom_name, is_custom, muscle_groups, duration, calories_burned, sets, completed_exercises } = req.body;
 
-  if (!duration) {
-    return res.status(400).json({ message: 'Duration is required to log workout session.' });
-  }
+  const validDuration = duration ? parseInt(duration) : 45;
 
   try {
     const parsedWorkoutId = (workout_id && !isNaN(parseInt(workout_id))) ? parseInt(workout_id) : null;
@@ -131,9 +129,9 @@ export async function logWorkoutCompletion(req, res) {
           const exercisesData = await Exercise.find({ exercise_id: { $in: exerciseIds } });
           const sumCaloriesPerMin = exercisesData.reduce((sum, ex) => sum + parseFloat(ex.calories_per_minute || 5.0), 0);
           const averageBurnRate = sumCaloriesPerMin / exercisesData.length;
-          finalCalories = Math.round(averageBurnRate * duration);
+          finalCalories = Math.round(averageBurnRate * validDuration);
         } else {
-          finalCalories = Math.round(5.0 * duration);
+          finalCalories = Math.round(5.0 * validDuration);
         }
       } else if (sets && sets.length > 0) {
         const setExIds = sets.map(s => s.exercise_id).filter(Boolean);
@@ -141,12 +139,12 @@ export async function logWorkoutCompletion(req, res) {
         if (exercisesData.length > 0) {
           const sumCaloriesPerMin = exercisesData.reduce((sum, ex) => sum + parseFloat(ex.calories_per_minute || 5.0), 0);
           const averageBurnRate = sumCaloriesPerMin / exercisesData.length;
-          finalCalories = Math.round(averageBurnRate * duration);
+          finalCalories = Math.round(averageBurnRate * validDuration);
         } else {
-          finalCalories = Math.round(5.0 * duration);
+          finalCalories = Math.round(5.0 * validDuration);
         }
       } else {
-        finalCalories = Math.round(5.0 * duration);
+        finalCalories = Math.round(5.0 * validDuration);
       }
     }
 
@@ -177,10 +175,11 @@ export async function logWorkoutCompletion(req, res) {
       user_id: userId,
       workout_id: parsedWorkoutId,
       workout_day_id: parsedWorkoutDayId,
+      custom_name: custom_name || null,
       is_custom: !!is_custom,
       muscle_groups: finalMuscleGroups,
       completed_exercises: completedExList,
-      actual_duration: duration,
+      actual_duration: validDuration,
       actual_calories_burned: finalCalories,
       logged_at: new Date()
     });
@@ -290,7 +289,7 @@ export async function getWorkoutHistory(req, res) {
           logged_at: log.logged_at,
           actual_duration: log.actual_duration,
           actual_calories_burned: log.actual_calories_burned,
-          workout_name: workout?.workout_name || (log.is_custom ? 'Freestyle Session' : 'Workout'),
+          workout_name: log.custom_name || workout?.workout_name || (log.is_custom ? 'Freestyle Session' : 'Workout'),
           difficulty: workout?.difficulty || 'Intermediate',
           is_custom: log.is_custom,
           muscle_groups: log.muscle_groups,
@@ -315,6 +314,27 @@ export async function backfillExerciseMuscleGroups() {
       console.log('Skipping backfill exercise muscle groups until MongoDB connection is ready.');
       return;
     }
+
+    // Ensure common abs exercises exist in database
+    const presetAbs = [
+      { exercise_name: 'Abdominal Crunches', muscle_group: 'Abs', muscle_groups: ['abs', 'core'], difficulty: 'Beginner', calories_per_minute: 5.0 },
+      { exercise_name: 'Plank Hold', muscle_group: 'Abs', muscle_groups: ['abs', 'core'], difficulty: 'Beginner', calories_per_minute: 4.5 },
+      { exercise_name: 'Russian Twists', muscle_group: 'Abs', muscle_groups: ['abs', 'core', 'obliques'], difficulty: 'Beginner', calories_per_minute: 5.5 },
+      { exercise_name: 'Bicycle Crunches', muscle_group: 'Abs', muscle_groups: ['abs', 'core', 'obliques'], difficulty: 'Intermediate', calories_per_minute: 6.0 }
+    ];
+
+    for (const abEx of presetAbs) {
+      const exists = await Exercise.findOne({ exercise_name: abEx.exercise_name });
+      if (!exists) {
+        const exerciseId = await getNextSequenceValue('exercise_id');
+        await Exercise.create({
+          exercise_id: exerciseId,
+          ...abEx,
+          instructions: `Perform ${abEx.exercise_name} focusing on core activation and controlled breathing.`
+        });
+      }
+    }
+
     const exercises = await Exercise.find({});
     for (const ex of exercises) {
       if (!ex.muscle_groups || ex.muscle_groups.length === 0) {
@@ -322,7 +342,7 @@ export async function backfillExerciseMuscleGroups() {
         let tags = [mg];
         if (mg.includes('chest')) tags = ['chest', 'triceps', 'shoulders'];
         else if (mg.includes('back')) tags = ['back', 'biceps'];
-        else if (mg.includes('leg')) tags = ['quads', 'hamstrings', 'glutes', 'calves'];
+        else if (mg.includes('leg')) tags = ['quads', 'hamstrings', 'glutes', 'calves', 'legs'];
         else if (mg.includes('shoulder')) tags = ['shoulders', 'triceps'];
         else if (mg.includes('arm')) tags = ['biceps', 'triceps'];
         else if (mg.includes('core') || mg.includes('abs')) tags = ['core', 'abs'];
@@ -457,64 +477,109 @@ export async function getTodaySuggestedWorkout(req, res) {
     let suggestedDay = null;
     let isRestDay = false;
 
+    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDayIndex = new Date().getDay(); // 0 = Sunday, 1 = Monday ... 4 = Thursday
+    const targetWeekday = (weekday && typeof weekday === 'string')
+      ? weekday.trim().toLowerCase()
+      : weekdays[currentDayIndex].toLowerCase();
+
+    // 1. Try matching by fixed_weekday field (e.g., 'Thursday')
+    suggestedDay = days.find(d => 
+      d.fixed_weekday && d.fixed_weekday.trim().toLowerCase() === targetWeekday
+    ) || null;
+
+    // 2. If no fixed_weekday match, check if schedule_mode is 'fixed'
     if (activeProgram.schedule_mode === 'fixed') {
-      const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-      const targetWeekday = (weekday && typeof weekday === 'string')
-        ? weekday.trim().toLowerCase()
-        : weekdays[new Date().getDay()].toLowerCase();
-
-      suggestedDay = days.find(d => 
-        d.fixed_weekday && d.fixed_weekday.trim().toLowerCase() === targetWeekday
-      ) || null;
-
+      if (!suggestedDay) {
+        // Also check if day name itself contains the weekday name (e.g., "Thursday Workout")
+        suggestedDay = days.find(d => d.name && d.name.toLowerCase().includes(targetWeekday)) || null;
+      }
       if (!suggestedDay) {
         isRestDay = true;
       }
-    } else {
-      // Rotating mode: Find WorkoutDay whose most recent UserWorkout log is the oldest (or null)
-      const dayLogs = await Promise.all(
-        days.map(async (day) => {
-          const lastLog = await UserWorkout.findOne({
-            user_id: userId,
-            workout_day_id: day.workout_day_id
-          }).sort({ logged_at: -1 }).lean();
+    } else if (!suggestedDay) {
+      // 3. Check if order_index matches current weekday (1=Monday ... 7=Sunday)
+      // Monday = index 1, Tuesday = 2, Wednesday = 3, Thursday = 4, Friday = 5, Saturday = 6, Sunday = 7
+      const weekdayOrderMap = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7 };
+      const todayOrder = weekdayOrderMap[currentDayIndex];
+      const matchedByOrder = days.find(d => d.order_index === todayOrder);
 
-          return {
-            day,
-            lastLoggedAt: lastLog ? new Date(lastLog.logged_at).getTime() : 0
-          };
-        })
-      );
+      if (matchedByOrder) {
+        suggestedDay = matchedByOrder;
+      } else {
+        // 4. Fallback to Rotating mode (oldest logged day)
+        const dayLogs = await Promise.all(
+          days.map(async (day) => {
+            const lastLog = await UserWorkout.findOne({
+              user_id: userId,
+              workout_day_id: day.workout_day_id
+            }).sort({ logged_at: -1 }).lean();
 
-      // Sort by lastLoggedAt ascending (0 = never logged = highest priority), tie-breaker order_index ascending
-      dayLogs.sort((a, b) => {
-        if (a.lastLoggedAt !== b.lastLoggedAt) {
-          return a.lastLoggedAt - b.lastLoggedAt;
-        }
-        return a.day.order_index - b.day.order_index;
-      });
+            return {
+              day,
+              lastLoggedAt: lastLog ? new Date(lastLog.logged_at).getTime() : 0
+            };
+          })
+        );
 
-      suggestedDay = dayLogs[0].day;
+        dayLogs.sort((a, b) => {
+          if (a.lastLoggedAt !== b.lastLoggedAt) {
+            return a.lastLoggedAt - b.lastLoggedAt;
+          }
+          return a.day.order_index - b.day.order_index;
+        });
+
+        suggestedDay = dayLogs[0].day;
+      }
     }
 
-    // Attach exercises if workout_id is linked
+    // Attach exercises if workout_id is linked, or find matching exercises by target muscle groups
     let exercises = [];
-    if (suggestedDay && suggestedDay.workout_id) {
-      const workoutExs = await WorkoutExercise.find({ workout_id: suggestedDay.workout_id })
-        .sort({ sequence_order: 1 })
-        .lean();
+    if (suggestedDay) {
+      if (suggestedDay.workout_id) {
+        const workoutExs = await WorkoutExercise.find({ workout_id: suggestedDay.workout_id })
+          .sort({ sequence_order: 1 })
+          .lean();
 
-      exercises = await Promise.all(
-        workoutExs.map(async (we) => {
-          const ex = await Exercise.findOne({ exercise_id: we.exercise_id }).lean();
-          return {
-            ...ex,
-            sequence_order: we.sequence_order,
-            default_sets: we.default_sets,
-            default_reps: we.default_reps
-          };
-        })
-      );
+        exercises = await Promise.all(
+          workoutExs.map(async (we) => {
+            const ex = await Exercise.findOne({ exercise_id: we.exercise_id }).lean();
+            return {
+              ...ex,
+              sequence_order: we.sequence_order,
+              default_sets: we.default_sets,
+              default_reps: we.default_reps
+            };
+          })
+        );
+      } else {
+        const targetTags = new Set();
+        if (suggestedDay.muscle_groups && Array.isArray(suggestedDay.muscle_groups)) {
+          suggestedDay.muscle_groups.forEach(m => targetTags.add(m.toLowerCase()));
+        }
+        const dayNameLower = (suggestedDay.name || '').toLowerCase();
+        if (dayNameLower.includes('push')) { ['chest', 'shoulders', 'triceps'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('pull')) { ['back', 'biceps'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('leg')) { ['legs', 'quads', 'glutes', 'hamstrings', 'calves'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('abs') || dayNameLower.includes('core')) { ['abs', 'core'].forEach(m => targetTags.add(m)); }
+        if (dayNameLower.includes('chest')) { targetTags.add('chest'); }
+        if (dayNameLower.includes('shoulder')) { targetTags.add('shoulders'); }
+        if (dayNameLower.includes('arm')) { ['biceps', 'triceps'].forEach(m => targetTags.add(m)); }
+
+        const tagsArr = Array.from(targetTags);
+        if (tagsArr.length > 0) {
+          exercises = await Exercise.find({
+            $or: [
+              { muscle_group: { $in: tagsArr.map(t => new RegExp(t, 'i')) } },
+              { muscle_groups: { $in: tagsArr.map(t => new RegExp(t, 'i')) } }
+            ]
+          }).limit(4).lean();
+        }
+      }
+
+      if (exercises && exercises.length > 4) {
+        exercises = exercises.slice(0, 4);
+      }
     }
 
     res.status(200).json({

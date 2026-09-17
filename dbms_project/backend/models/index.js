@@ -96,6 +96,7 @@ const userWorkoutSchema = new mongoose.Schema({
   user_id: { type: Number, required: true, index: true },
   workout_id: { type: Number, default: null, index: true },
   workout_day_id: { type: Number, default: null, index: true },
+  custom_name: { type: String, default: null },
   is_custom: { type: Boolean, default: false },
   muscle_groups: { type: [String], default: [] },
   completed_exercises: { type: [String], default: [] },

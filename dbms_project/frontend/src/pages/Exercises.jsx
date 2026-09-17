@@ -115,12 +115,12 @@ export default function Exercises({ apiUrl, token }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="font-display text-4xl font-black text-white tracking-tight uppercase">EXERCISE LIBRARY</h1>
+          <h1 className="font-display text-2xl sm:text-4xl font-black text-white tracking-tight uppercase">EXERCISE LIBRARY</h1>
           <p className="text-[#E5E5E5]/70 text-xs mt-1 font-medium">Browse, search, and learn proper execution techniques for various movements.</p>
         </div>
         <button
           onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-5 py-3 rounded-2xl text-xs uppercase tracking-wider transition-all shadow-md shrink-0"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-5 py-3 rounded-2xl text-xs uppercase tracking-wider transition-all shadow-md shrink-0 min-h-[44px]"
         >
           <Plus size={16} />
           Add Custom Exercise
@@ -128,7 +128,7 @@ export default function Exercises({ apiUrl, token }) {
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-[#1E1E1E] border border-[#474747]/40 p-5 rounded-3xl space-y-4 shadow-lg">
+      <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-5 rounded-3xl space-y-4 shadow-lg">
         {/* Search */}
         <div className="relative">
           <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#474747]" />
@@ -137,7 +137,7 @@ export default function Exercises({ apiUrl, token }) {
             placeholder="Search exercises (e.g. Bench Press)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-[#D4FF00] transition-all placeholder:text-[#474747]"
+            className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-3 pl-11 pr-4 text-sm focus:outline-none focus:border-[#D4FF00] transition-all placeholder:text-[#474747] min-h-[44px]"
           />
         </div>
 
@@ -153,7 +153,7 @@ export default function Exercises({ apiUrl, token }) {
               <button
                 key={mg}
                 onClick={() => setMuscleGroup(mg)}
-                className={`text-xs font-display font-bold px-3 py-1.5 rounded-full shrink-0 transition-all uppercase tracking-wider ${muscleGroup === mg ? 'bg-[#D4FF00] text-black shadow-sm' : 'bg-[#0A0A0A] border border-[#474747]/50 text-[#E5E5E5]/70 hover:border-[#D4FF00]/50'}`}
+                className={`text-xs font-display font-bold px-3.5 py-2 rounded-full shrink-0 transition-all uppercase tracking-wider min-h-[44px] flex items-center justify-center ${muscleGroup === mg ? 'bg-[#D4FF00] text-black shadow-sm' : 'bg-[#0A0A0A] border border-[#474747]/50 text-[#E5E5E5]/70 hover:border-[#D4FF00]/50'}`}
               >
                 {mg}
               </button>
@@ -170,7 +170,7 @@ export default function Exercises({ apiUrl, token }) {
               <button
                 key={diff}
                 onClick={() => setDifficulty(diff)}
-                className={`text-xs font-display font-bold px-3 py-1.5 rounded-full shrink-0 transition-all uppercase tracking-wider ${difficulty === diff ? 'bg-white text-black shadow-sm' : 'bg-[#0A0A0A] border border-[#474747]/50 text-[#E5E5E5]/70 hover:border-white/50'}`}
+                className={`text-xs font-display font-bold px-3.5 py-2 rounded-full shrink-0 transition-all uppercase tracking-wider min-h-[44px] flex items-center justify-center ${difficulty === diff ? 'bg-white text-black shadow-sm' : 'bg-[#0A0A0A] border border-[#474747]/50 text-[#E5E5E5]/70 hover:border-white/50'}`}
               >
                 {diff}
               </button>
@@ -228,45 +228,45 @@ export default function Exercises({ apiUrl, token }) {
 
       {/* DETAIL MODAL */}
       {selectedEx && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="w-full max-w-2xl bg-[#1E1E1E] border border-[#474747] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             
             {/* Modal Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-[#474747] bg-[#0A0A0A]">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#474747] bg-[#0A0A0A]">
               <div>
-                <span className="text-xs text-[#D4FF00] font-display font-bold uppercase tracking-widest">{selectedEx.muscle_group} Routine</span>
-                <h3 className="text-2xl font-display font-black text-white mt-0.5 uppercase tracking-wide">{selectedEx.exercise_name}</h3>
+                <span className="text-[10px] sm:text-xs text-[#D4FF00] font-display font-bold uppercase tracking-widest">{selectedEx.muscle_group} Routine</span>
+                <h3 className="text-xl sm:text-2xl font-display font-black text-white mt-0.5 uppercase tracking-wide">{selectedEx.exercise_name}</h3>
               </div>
               <button 
                 onClick={() => setSelectedEx(null)}
-                className="p-1.5 hover:bg-[#1E1E1E] rounded-lg text-[#E5E5E5]/60 hover:text-white transition-colors"
+                className="p-2 hover:bg-[#1E1E1E] rounded-xl text-[#E5E5E5]/60 hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-5 overflow-y-auto max-h-[70vh]">
+            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto max-h-[70vh]">
               {/* Telemetry info row */}
-              <div className="grid grid-cols-3 gap-4">
-                <div className="bg-[#0A0A0A] p-3 rounded-2xl border border-[#474747]/40 text-center">
-                  <span className="text-[10px] text-[#E5E5E5]/50 uppercase font-display font-bold tracking-wider">Difficulty</span>
-                  <p className="text-sm font-extrabold text-white mt-1">{selectedEx.difficulty}</p>
+              <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                <div className="bg-[#0A0A0A] p-2.5 sm:p-3 rounded-2xl border border-[#474747]/40 text-center">
+                  <span className="text-[9px] sm:text-[10px] text-[#E5E5E5]/50 uppercase font-display font-bold tracking-wider">Difficulty</span>
+                  <p className="text-xs sm:text-sm font-extrabold text-white mt-1">{selectedEx.difficulty}</p>
                 </div>
-                <div className="bg-[#0A0A0A] p-3 rounded-2xl border border-[#474747]/40 text-center">
-                  <span className="text-[10px] text-[#E5E5E5]/50 uppercase font-display font-bold tracking-wider">Calories</span>
-                  <p className="text-sm font-extrabold text-[#D4FF00] mt-1">{selectedEx.calories_per_minute} / min</p>
+                <div className="bg-[#0A0A0A] p-2.5 sm:p-3 rounded-2xl border border-[#474747]/40 text-center">
+                  <span className="text-[9px] sm:text-[10px] text-[#E5E5E5]/50 uppercase font-display font-bold tracking-wider">Calories</span>
+                  <p className="text-xs sm:text-sm font-extrabold text-[#D4FF00] mt-1">{selectedEx.calories_per_minute} / min</p>
                 </div>
-                <div className="bg-[#0A0A0A] p-3 rounded-2xl border border-[#474747]/40 text-center">
-                  <span className="text-[10px] text-[#E5E5E5]/50 uppercase font-display font-bold tracking-wider">Target Muscle</span>
-                  <p className="text-sm font-extrabold text-white mt-1">{selectedEx.muscle_group}</p>
+                <div className="bg-[#0A0A0A] p-2.5 sm:p-3 rounded-2xl border border-[#474747]/40 text-center">
+                  <span className="text-[9px] sm:text-[10px] text-[#E5E5E5]/50 uppercase font-display font-bold tracking-wider">Target</span>
+                  <p className="text-xs sm:text-sm font-extrabold text-white mt-1">{selectedEx.muscle_group}</p>
                 </div>
               </div>
 
               {/* Instructions */}
               <div>
-                <h4 className="font-display font-bold text-white mb-2 text-sm uppercase tracking-wider">Exercise Instructions</h4>
-                <p className="text-sm text-[#E5E5E5]/80 leading-relaxed whitespace-pre-line bg-[#0A0A0A] p-4 rounded-2xl border border-[#474747]/40">
+                <h4 className="font-display font-bold text-white mb-2 text-xs sm:text-sm uppercase tracking-wider">Exercise Instructions</h4>
+                <p className="text-xs sm:text-sm text-[#E5E5E5]/80 leading-relaxed whitespace-pre-line bg-[#0A0A0A] p-3.5 sm:p-4 rounded-2xl border border-[#474747]/40">
                   {selectedEx.instructions || 'No instructions provided.'}
                 </p>
               </div>
@@ -274,26 +274,26 @@ export default function Exercises({ apiUrl, token }) {
               {/* Video Demonstrations */}
               {selectedEx.video_url && (
                 <div>
-                  <h4 className="font-display font-bold text-white mb-2.5 text-sm uppercase tracking-wider">Video Demonstration</h4>
+                  <h4 className="font-display font-bold text-white mb-2.5 text-xs sm:text-sm uppercase tracking-wider">Video Demonstration</h4>
                   <a 
                     href={selectedEx.video_url} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 p-4 rounded-2xl transition-all font-semibold text-sm group"
+                    className="flex items-center gap-3 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 p-3.5 sm:p-4 rounded-2xl transition-all font-semibold text-xs sm:text-sm group min-h-[44px]"
                   >
-                    <PlayCircle size={22} className="group-hover:scale-105 transition-transform text-red-500" />
+                    <PlayCircle size={20} className="group-hover:scale-105 transition-transform text-red-500 shrink-0" />
                     <span>Watch Tutorial Video on YouTube</span>
-                    <ExternalLink size={14} className="ml-auto" />
+                    <ExternalLink size={14} className="ml-auto shrink-0" />
                   </a>
                 </div>
               )}
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-[#0A0A0A] border-t border-[#474747] text-right">
+            <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-[#0A0A0A] border-t border-[#474747] text-right">
               <button 
                 onClick={() => setSelectedEx(null)}
-                className="bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-5 py-2.5 rounded-xl transition-all text-xs uppercase tracking-wider"
+                className="w-full sm:w-auto bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-5 py-2.5 rounded-xl transition-all text-xs uppercase tracking-wider min-h-[44px]"
               >
                 Close Details
               </button>
@@ -304,25 +304,25 @@ export default function Exercises({ apiUrl, token }) {
 
       {/* CREATE EXERCISE FORM MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4">
           <div className="w-full max-w-lg bg-[#1E1E1E] border border-[#474747] rounded-3xl shadow-2xl overflow-hidden flex flex-col">
             
             {/* Modal Header */}
-            <div className="flex justify-between items-center px-6 py-4 border-b border-[#474747] bg-[#0A0A0A]">
+            <div className="flex justify-between items-center px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#474747] bg-[#0A0A0A]">
               <div>
-                <h3 className="text-xl font-display font-bold text-white uppercase tracking-wide">Add Custom Exercise</h3>
+                <h3 className="text-lg sm:text-xl font-display font-bold text-white uppercase tracking-wide">Add Custom Exercise</h3>
                 <p className="text-xs text-[#E5E5E5]/60 mt-0.5">Insert a new movement to be used inside your custom workout plans.</p>
               </div>
               <button 
                 onClick={() => { setShowCreateModal(false); setFormError(''); }}
-                className="p-1.5 hover:bg-[#1E1E1E] rounded-lg text-[#E5E5E5]/60 hover:text-white transition-colors"
+                className="p-2 hover:bg-[#1E1E1E] rounded-xl text-[#E5E5E5]/60 hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
               >
                 <X size={20} />
               </button>
             </div>
 
             {/* Modal Body / Form */}
-            <form onSubmit={handleCreateExercise} className="p-6 space-y-4 overflow-y-auto max-h-[70vh]">
+            <form onSubmit={handleCreateExercise} className="p-4 sm:p-6 space-y-4 overflow-y-auto max-h-[70vh]">
               {formError && (
                 <div className="bg-red-500/10 text-red-400 p-3.5 rounded-xl text-xs font-bold border border-red-500/20">
                   {formError}
@@ -337,17 +337,17 @@ export default function Exercises({ apiUrl, token }) {
                   placeholder="e.g. Diamond Push-Ups"
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#D4FF00]"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Target Muscle</label>
                   <select
                     value={newMuscle}
                     onChange={(e) => setNewMuscle(e.target.value)}
-                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#D4FF00]"
+                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                   >
                     {muscleGroups.filter(m => m !== 'All').map(m => (
                       <option key={m} value={m}>{m}</option>
@@ -359,7 +359,7 @@ export default function Exercises({ apiUrl, token }) {
                   <select
                     value={newDifficultyLevel}
                     onChange={(e) => setNewDifficultyLevel(e.target.value)}
-                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#D4FF00]"
+                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-3 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                   >
                     {difficulties.filter(d => d !== 'All').map(d => (
                       <option key={d} value={d}>{d}</option>
@@ -368,7 +368,7 @@ export default function Exercises({ apiUrl, token }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Est Kcal / Minute</label>
                   <input
@@ -377,7 +377,7 @@ export default function Exercises({ apiUrl, token }) {
                     required
                     value={newCaloriesPerMin}
                     onChange={(e) => setNewCaloriesPerMin(e.target.value)}
-                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#D4FF00]"
+                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                   />
                 </div>
                 <div>
@@ -387,7 +387,7 @@ export default function Exercises({ apiUrl, token }) {
                     placeholder="https://youtube.com/..."
                     value={newVideoUrl}
                     onChange={(e) => setNewVideoUrl(e.target.value)}
-                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#D4FF00]"
+                    className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 px-4 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                   />
                 </div>
               </div>
@@ -403,18 +403,18 @@ export default function Exercises({ apiUrl, token }) {
                 />
               </div>
 
-              <div className="flex gap-4 pt-4 border-t border-[#474747]">
+              <div className="flex gap-3 sm:gap-4 pt-4 border-t border-[#474747]">
                 <button
                   type="button"
                   onClick={() => { setShowCreateModal(false); setFormError(''); }}
-                  className="flex-1 bg-[#0A0A0A] border border-[#474747] hover:bg-[#151515] text-[#E5E5E5] font-display font-bold py-3 rounded-xl transition-all text-xs uppercase tracking-wider"
+                  className="flex-1 bg-[#0A0A0A] border border-[#474747] hover:bg-[#151515] text-[#E5E5E5] font-display font-bold py-3 rounded-xl transition-all text-xs uppercase tracking-wider min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={formLoading}
-                  className="flex-1 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold py-3 rounded-xl transition-all text-xs uppercase tracking-wider shadow-md disabled:opacity-50"
+                  className="flex-1 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold py-3 rounded-xl transition-all text-xs uppercase tracking-wider shadow-md disabled:opacity-50 min-h-[44px]"
                 >
                   {formLoading ? 'Adding...' : 'Save to Library'}
                 </button>

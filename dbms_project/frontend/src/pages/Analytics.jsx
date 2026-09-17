@@ -194,13 +194,13 @@ export default function Analytics({ apiUrl, token }) {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="font-display text-4xl font-black text-white tracking-widest uppercase">PROGRESS & ANALYTICS</h1>
-          <p className="text-[#E5E5E5]/70 text-sm mt-1 font-medium">Review weight trends, caloric ratios, training muscle group charts, and export reports.</p>
+          <h1 className="font-display text-2xl sm:text-4xl font-black text-white tracking-widest uppercase">PROGRESS & ANALYTICS</h1>
+          <p className="text-[#E5E5E5]/70 text-xs sm:text-sm mt-1 font-medium">Review weight trends, caloric ratios, training muscle group charts, and export reports.</p>
         </div>
         <button
           onClick={handleExportPdf}
           disabled={!pdfData}
-          className="flex items-center gap-2 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-5 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all shadow-md shrink-0 cursor-pointer disabled:opacity-50"
+          className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold px-5 py-3 rounded-2xl text-xs uppercase tracking-widest transition-all shadow-md shrink-0 cursor-pointer disabled:opacity-50 min-h-[44px]"
         >
           <FileText size={16} />
           Export PDF Report
@@ -210,9 +210,9 @@ export default function Analytics({ apiUrl, token }) {
       {/* Weight logger + stats Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Weight Logger Form */}
-        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-6 rounded-3xl shadow-lg flex flex-col justify-between">
+        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg flex flex-col justify-between">
           <div>
-            <h3 className="font-display text-xl font-bold text-white flex items-center gap-2 mb-2 uppercase tracking-wider">
+            <h3 className="font-display text-lg sm:text-xl font-bold text-white flex items-center gap-2 mb-2 uppercase tracking-wider">
               <Scale size={20} className="text-[#D4FF00]" />
               Update Daily Weight
             </h3>
@@ -229,7 +229,7 @@ export default function Analytics({ apiUrl, token }) {
                 placeholder="e.g. 74.5"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
-                className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#D4FF00]"
+                className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 sm:py-3 px-4 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
               />
             </div>
             <div>
@@ -240,7 +240,7 @@ export default function Analytics({ apiUrl, token }) {
                 placeholder="e.g. 14.5"
                 value={bodyFat}
                 onChange={(e) => setBodyFat(e.target.value)}
-                className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-3 px-4 text-sm focus:outline-none focus:border-[#D4FF00]"
+                className="w-full bg-[#0A0A0A] border border-[#474747] text-white rounded-xl py-2.5 sm:py-3 px-4 text-sm focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
               />
             </div>
 
@@ -258,7 +258,7 @@ export default function Analytics({ apiUrl, token }) {
 
             <button
               type="submit"
-              className="w-full bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold py-3 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md cursor-pointer"
+              className="w-full bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold py-3 rounded-xl text-xs uppercase tracking-widest transition-all shadow-md cursor-pointer min-h-[44px]"
             >
               Log Metrics
             </button>

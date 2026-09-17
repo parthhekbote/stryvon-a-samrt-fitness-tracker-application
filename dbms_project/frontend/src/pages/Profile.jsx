@@ -118,24 +118,24 @@ export default function Profile({ apiUrl, token, onLogout }) {
   }
 
   return (
-    <div className="space-y-8 animate-slide-up">
+    <div className="space-y-6 sm:space-y-8 text-white">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-slate-800 dark:text-white">Profile Settings & Achievements</h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-1">Configure your physical goals, change diet plans, or review earned badges.</p>
+        <h1 className="text-2xl sm:text-3xl font-display font-black text-white uppercase tracking-wider">Profile Settings & Achievements</h1>
+        <p className="text-[#E5E5E5]/70 text-xs sm:text-sm mt-1 font-medium">Configure your physical goals, change diet plans, or review earned badges.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 columns: Profile settings form */}
-        <div className="lg:col-span-2 glass-panel p-6 rounded-3xl shadow-sm">
-          <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100 dark:border-dark-border">
-            <Settings2 className="text-accent-emerald" size={20} />
-            <h3 className="font-bold text-lg text-slate-800 dark:text-white">Body Parameters</h3>
+        <div className="lg:col-span-2 bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg">
+          <div className="flex items-center gap-2 mb-6 pb-4 border-b border-[#474747]/40">
+            <Settings2 className="text-[#D4FF00]" size={20} />
+            <h3 className="font-display font-bold text-lg text-white uppercase tracking-wider">Body Parameters</h3>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
             {success && (
-              <div className="flex items-center gap-2 bg-emerald-500/10 text-accent-emerald border border-accent-emerald/20 p-4 rounded-xl text-xs font-bold">
+              <div className="flex items-center gap-2 bg-[#D4FF00]/10 text-[#D4FF00] border border-[#D4FF00]/20 p-4 rounded-xl text-xs font-bold font-display uppercase tracking-wider">
                 <Check size={16} />
                 <span>Profile configuration updated successfully!</span>
               </div>
@@ -149,33 +149,33 @@ export default function Profile({ apiUrl, token, onLogout }) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Account Username</label>
+                <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Account Username</label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Age (Years)</label>
+                <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Age (Years)</label>
                 <input
                   type="number"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Gender</label>
+                <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Gender</label>
                 <select
                   value={gender}
                   onChange={(e) => setGender(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 >
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
@@ -183,33 +183,33 @@ export default function Profile({ apiUrl, token, onLogout }) {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Height (cm)</label>
+                <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Height (cm)</label>
                 <input
                   type="number"
                   value={height}
                   onChange={(e) => setHeight(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 />
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Weight (kg)</label>
+                <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Weight (kg)</label>
                 <input
                   type="number"
                   step="0.1"
                   value={weight}
                   onChange={(e) => setWeight(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Primary Fitness Goal</label>
+                <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Primary Fitness Goal</label>
                 <select
                   value={goalType}
                   onChange={(e) => setGoalType(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 >
                   <option value="Fat Loss">Fat Loss</option>
                   <option value="Maintain">Maintain & Tone</option>
@@ -218,22 +218,22 @@ export default function Profile({ apiUrl, token, onLogout }) {
                 </select>
               </div>
               <div>
-                <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Water Intake Goal (ml)</label>
+                <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Water Intake Goal (ml)</label>
                 <input
                   type="number"
                   value={waterGoal}
                   onChange={(e) => setWaterGoal(e.target.value)}
-                  className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                  className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
                 />
               </div>
             </div>
 
             <div>
-              <label className="text-xs text-slate-400 block mb-1.5 font-bold uppercase tracking-wider">Active Nutrition Diet Plan</label>
+              <label className="text-xs text-[#E5E5E5]/70 block mb-1.5 font-bold uppercase tracking-wider font-display">Active Nutrition Diet Plan</label>
               <select
                 value={dietId}
                 onChange={(e) => setDietId(e.target.value)}
-                className="w-full bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl py-3 px-4 text-sm text-slate-800 dark:text-white focus:outline-none"
+                className="w-full bg-[#0A0A0A] border border-[#474747] rounded-xl py-2.5 sm:py-3 px-4 text-sm text-white focus:outline-none focus:border-[#D4FF00] min-h-[44px]"
               >
                 <option value="">No Active Diet Plan Selected</option>
                 {dietPlans.map((plan) => (
@@ -244,10 +244,10 @@ export default function Profile({ apiUrl, token, onLogout }) {
               </select>
             </div>
 
-            <div className="flex gap-4 pt-4 border-t border-slate-100 dark:border-dark-border">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 border-t border-[#474747]/40">
               <button
                 type="submit"
-                className="flex-1 bg-gradient-to-r from-accent-emerald to-accent-teal hover:opacity-90 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-accent-emerald/10 transition-all flex items-center justify-center gap-1.5 text-sm"
+                className="flex-1 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider shadow-md min-h-[44px]"
               >
                 <Check size={16} />
                 Save Profile Parameters
@@ -255,7 +255,7 @@ export default function Profile({ apiUrl, token, onLogout }) {
               <button
                 type="button"
                 onClick={onLogout}
-                className="px-6 py-3.5 border border-rose-500/20 hover:bg-rose-500/10 text-rose-500 rounded-xl font-bold transition-all text-sm flex items-center gap-1.5"
+                className="px-6 py-3 border border-rose-500/30 hover:bg-rose-500/10 text-rose-400 rounded-xl font-display font-bold transition-all text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 min-h-[44px]"
               >
                 <LogOut size={16} />
                 Logout
@@ -265,11 +265,11 @@ export default function Profile({ apiUrl, token, onLogout }) {
         </div>
 
         {/* Right 1 column: Achievement badges showcase */}
-        <div className="glass-panel p-6 rounded-3xl shadow-sm flex flex-col justify-between">
+        <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-slate-100 dark:border-dark-border">
-              <Award className="text-accent-violet" size={20} />
-              <h3 className="font-bold text-lg text-slate-800 dark:text-white">Fitness Badges</h3>
+            <div className="flex items-center gap-2 mb-6 pb-4 border-b border-[#474747]/40">
+              <Award className="text-[#D4FF00]" size={20} />
+              <h3 className="font-display font-bold text-lg text-white uppercase tracking-wider">Fitness Badges</h3>
             </div>
             
             {profile?.badges && profile.badges.length > 0 ? (
@@ -277,16 +277,16 @@ export default function Profile({ apiUrl, token, onLogout }) {
                 {profile.badges.map((badge, idx) => (
                   <div 
                     key={idx} 
-                    className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-100/50 dark:bg-white/[0.01] border border-slate-200/50 dark:border-white/5 hover:border-accent-violet/30 transition-all"
+                    className="flex items-center gap-3.5 p-3 rounded-2xl bg-[#0A0A0A] border border-[#474747]/40 hover:border-[#D4FF00]/40 transition-all"
                   >
-                    <div className="h-10 w-10 bg-gradient-to-tr from-accent-violet to-purple-600 rounded-2xl flex items-center justify-center text-white shrink-0 shadow-lg shadow-violet-500/10">
-                      <Heart size={18} className="fill-white/10" />
+                    <div className="h-10 w-10 bg-[#D4FF00]/10 border border-[#D4FF00]/20 rounded-2xl flex items-center justify-center text-[#D4FF00] shrink-0 shadow-md">
+                      <Heart size={18} />
                     </div>
                     <div>
-                      <span className="font-bold text-sm text-slate-800 dark:text-slate-100 block leading-snug">
+                      <span className="font-bold text-sm text-white block leading-snug">
                         {badge}
                       </span>
-                      <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">
+                      <span className="text-[10px] text-[#E5E5E5]/50 font-semibold block mt-0.5 uppercase tracking-wider font-display">
                         Unlocked & Earned
                       </span>
                     </div>
@@ -294,19 +294,19 @@ export default function Profile({ apiUrl, token, onLogout }) {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-10 text-slate-400 text-sm">
-                <Award size={36} className="mx-auto mb-2 text-slate-400 opacity-40" />
+              <div className="text-center py-10 text-[#E5E5E5]/40 text-sm">
+                <Award size={36} className="mx-auto mb-2 text-[#D4FF00] opacity-40 animate-pulse" />
                 <span>Your unlocked achievement badges will show up here. Keep active!</span>
               </div>
             )}
           </div>
 
           {/* Quick Body status stats brief */}
-          <div className="mt-6 pt-4 border-t border-slate-100 dark:border-dark-border text-center">
-            <span className="text-xs text-slate-400 font-bold uppercase tracking-wider block mb-2">Calculated Health Index</span>
-            <div className="inline-flex items-center gap-2 bg-slate-100 dark:bg-white/5 px-4 py-2.5 rounded-2xl border border-slate-200 dark:border-white/5">
-              <Activity size={16} className="text-accent-emerald" />
-              <span className="text-sm font-bold text-slate-700 dark:text-slate-300">BMI: {profile?.bmi || 'N/A'}</span>
+          <div className="mt-6 pt-4 border-t border-[#474747]/40 text-center">
+            <span className="text-xs text-[#E5E5E5]/60 font-bold uppercase tracking-wider font-display block mb-2">Calculated Health Index</span>
+            <div className="inline-flex items-center gap-2 bg-[#0A0A0A] px-4 py-2.5 rounded-2xl border border-[#474747]/40">
+              <Activity size={16} className="text-[#D4FF00]" />
+              <span className="text-sm font-bold text-white">BMI: {profile?.bmi || 'N/A'}</span>
             </div>
           </div>
         </div>
