@@ -1,0 +1,15 @@
+{
+  "name": "dbms_project-root",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --prefix dbms_project/frontend",
+    "dev:backend": "npm run dev --prefix dbms_project/backend",
+    "dev:server": "npm run dev --prefix dbms_project/backend",
+    "build": "npm run build --prefix dbms_project/frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
