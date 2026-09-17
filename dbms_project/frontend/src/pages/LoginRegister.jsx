@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import SplashScreen from '../components/SplashScreen';
 import StryvonLogo from '../components/StryvonLogo';
 import { auth, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from '../config/firebase';
 import { 
@@ -17,7 +16,6 @@ import {
 } from 'lucide-react';
 
 export default function LoginRegister({ onLogin, apiUrl }) {
-  const [showSplash, setShowSplash] = useState(true);
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
   const [welcomeBanner, setWelcomeBanner] = useState('');
@@ -158,14 +156,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
   };
 
   return (
-    <>
-      <AnimatePresence mode="wait">
-        {showSplash && (
-          <SplashScreen key="splash" onFinish={() => setShowSplash(false)} />
-        )}
-      </AnimatePresence>
-
-      <div className="min-h-screen w-full flex bg-[#0A0A0A] text-[#E5E5E5] font-sans overflow-hidden">
+    <div className="min-h-screen w-full flex bg-[#0A0A0A] text-[#E5E5E5] font-sans overflow-hidden">
 
       {/* LEFT COLUMN: Motivating Cinematic Hero Panel with Bodybuilder Background */}
       <div className="hidden lg:flex flex-col justify-between w-1/2 p-14 border-r border-[#474747]/30 relative overflow-hidden bg-[#0A0A0A]">
@@ -646,7 +637,6 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         </motion.div>
       </div>
     </div>
-    </>
   );
 }
 

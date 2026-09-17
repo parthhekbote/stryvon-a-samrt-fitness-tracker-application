@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
+import SplashScreen from './components/SplashScreen';
 import Layout from './components/Layout';
 import LoginRegister from './pages/LoginRegister';
 import Dashboard from './pages/Dashboard';
@@ -13,6 +15,7 @@ import Profile from './pages/Profile';
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || '');
   const [user, setUser] = useState(null);
+  const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('stryvon_splash_played'));
 
   // Enforce permanent dark mode (Figma design system)
   useEffect(() => {
@@ -30,6 +33,11 @@ export default function App() {
       }
     }
   }, [token]);
+
+  const handleSplashFinish = () => {
+    sessionStorage.setItem('stryvon_splash_played', 'true');
+    setShowSplash(false);
+  };
 
   const handleLogin = (newToken, userData) => {
     localStorage.clear();
@@ -50,39 +58,47 @@ export default function App() {
   const API_URL = 'http://localhost:5001/api';
 
   return (
-    <Router>
-      <Routes>
-        {/* Public auth route */}
-        <Route 
-          path="/login" 
-          element={token ? <Navigate to="/" /> : <LoginRegister onLogin={handleLogin} apiUrl={API_URL} />} 
-        />
+    <>
+      <AnimatePresence mode="wait">
+        {showSplash && (
+          <SplashScreen key="app-splash" onFinish={handleSplashFinish} />
+        )}
+      </AnimatePresence>
 
-        {/* Protected layout routes */}
-        <Route 
-          path="/" 
-          element={
-            token ? (
-              <Layout 
-                user={user} 
-                onLogout={handleLogout} 
-              />
-            ) : (
-              <Navigate to="/login" />
-            )
-          }
-        >
-          <Route index element={<Dashboard apiUrl={API_URL} token={token} user={user} />} />
-          <Route path="workouts" element={<Workouts apiUrl={API_URL} token={token} />} />
-          <Route path="exercises" element={<Exercises apiUrl={API_URL} token={token} />} />
-          <Route path="diet" element={<Diet apiUrl={API_URL} token={token} user={user} />} />
-          <Route path="coach" element={<AICoach apiUrl={API_URL} token={token} user={user} />} />
-          <Route path="analytics" element={<Analytics apiUrl={API_URL} token={token} />} />
-          <Route path="profile" element={<Profile apiUrl={API_URL} token={token} onLogout={handleLogout} />} />
-        </Route>
+      <Router>
+        <Routes>
+          {/* Public auth route */}
+          <Route 
+            path="/login" 
+            element={token ? <Navigate to="/" /> : <LoginRegister onLogin={handleLogin} apiUrl={API_URL} />} 
+          />
 
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </Router>
+          {/* Protected layout routes */}
+          <Route 
+            path="/" 
+            element={
+              token ? (
+                <Layout 
+                  user={user} 
+                  onLogout={handleLogout} 
+                />
+              ) : (
+                <Navigate to="/login" />
+              )
+            }
+          >
+            <Route index element={<Dashboard apiUrl={API_URL} token={token} user={user} />} />
+            <Route path="workouts" element={<Workouts apiUrl={API_URL} token={token} />} />
+            <Route path="exercises" element={<Exercises apiUrl={API_URL} token={token} />} />
+            <Route path="diet" element={<Diet apiUrl={API_URL} token={token} user={user} />} />
+            <Route path="coach" element={<AICoach apiUrl={API_URL} token={token} user={user} />} />
+            <Route path="analytics" element={<Analytics apiUrl={API_URL} token={token} />} />
+            <Route path="profile" element={<Profile apiUrl={API_URL} token={token} onLogout={handleLogout} />} />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+    </>
   );
 }
