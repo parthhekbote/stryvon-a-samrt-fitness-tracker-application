@@ -199,10 +199,10 @@ export async function logWorkoutCompletion(req, res) {
       }
     }
 
-    await updateStreak(userId);
+    const streakData = await updateStreak(userId, req.body.user_date);
 
     // Update progress table's calories_burned for today
-    const today = new Date().toISOString().split('T')[0];
+    const today = req.body.user_date || new Date().toISOString().split('T')[0];
     const user = await User.findOne({ user_id: userId });
     const userWeight = user?.weight || 70.0;
     const userHeight = user?.height;
@@ -233,7 +233,12 @@ export async function logWorkoutCompletion(req, res) {
       await awardBadge(userId, 'Fitness Novice (5 Workouts)');
     }
 
-    res.status(201).json({ message: 'Workout logged successfully.', userWorkoutId, caloriesBurned: finalCalories });
+    res.status(201).json({ 
+      message: 'Workout logged successfully.', 
+      userWorkoutId, 
+      caloriesBurned: finalCalories,
+      streak: streakData
+    });
   } catch (error) {
     console.error('Failed to log workout completion:', error);
     res.status(500).json({ message: 'Failed to record workout session.' });

@@ -14,49 +14,85 @@ function calculateBMI(weightKg, heightCm) {
 }
 
 // Helper to update active streak
-export async function updateStreak(userId) {
+export async function updateStreak(userId, clientDate = null) {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = clientDate || new Date().toISOString().split('T')[0];
     const user = await User.findOne({ user_id: userId });
     
-    if (!user) return;
+    if (!user) return { current_streak: 0, longest_streak: 0, last_workout_date: null, isNewMilestone: false, milestoneUnlocked: null };
 
-    let newStreak = user.streak_count || 0;
-    const lastActive = user.last_active_date;
+    let current = user.current_streak || user.streak_count || 0;
+    let longest = user.longest_streak || current;
+    let milestones = user.streak_milestones || [];
+    const lastWorkoutStr = user.last_workout_date || user.last_active_date;
 
-    if (!lastActive) {
-      newStreak = 1;
+    let isNewMilestone = false;
+    let milestoneUnlocked = null;
+
+    if (!lastWorkoutStr) {
+      // First ever workout completed
+      current = 1;
     } else {
-      const lastActiveDateStr = typeof lastActive === 'string' ? lastActive.split('T')[0] : new Date(lastActive).toISOString().split('T')[0];
-      if (lastActiveDateStr === today) {
-        // Already active today, streak stays the same
-        return;
+      const lastDateClean = typeof lastWorkoutStr === 'string' ? lastWorkoutStr.split('T')[0] : new Date(lastWorkoutStr).toISOString().split('T')[0];
+      
+      if (lastDateClean === today) {
+        // User already logged a workout today -> streak counts max once per calendar day
+        return {
+          current_streak: current,
+          longest_streak: longest,
+          last_workout_date: today,
+          isNewMilestone: false,
+          milestoneUnlocked: null
+        };
       }
 
-      const lastDate = new Date(lastActiveDateStr);
+      const lastDate = new Date(lastDateClean);
       const currentDate = new Date(today);
       const diffTime = Math.abs(currentDate - lastDate);
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
       if (diffDays === 1) {
-        newStreak += 1;
+        // Exactly consecutive day -> increment streak by 1
+        current += 1;
       } else {
-        newStreak = 1;
+        // Missed 1 or more days -> reset streak to 1 (today's workout starts new streak)
+        current = 1;
       }
     }
 
-    user.streak_count = newStreak;
+    if (current > longest) {
+      longest = current;
+    }
+
+    // Milestone threshold check (3, 7, 14, 30, 60, 100)
+    const milestoneThresholds = [3, 7, 14, 30, 60, 100];
+    if (milestoneThresholds.includes(current) && !milestones.includes(current)) {
+      milestoneUnlocked = current;
+      isNewMilestone = true;
+      milestones.push(current);
+
+      await awardBadge(userId, `${current}-Day Streak Master`);
+    }
+
+    user.current_streak = current;
+    user.streak_count = current;
+    user.longest_streak = longest;
+    user.last_workout_date = today;
     user.last_active_date = today;
+    user.streak_milestones = milestones;
+
     await user.save();
 
-    // Gamification check: Award badges for streak milestones
-    if (newStreak >= 7) {
-      await awardBadge(userId, '7-Day Streak Master');
-    } else if (newStreak >= 3) {
-      await awardBadge(userId, '3-Day Fire Streak');
-    }
+    return {
+      current_streak: current,
+      longest_streak: longest,
+      last_workout_date: today,
+      isNewMilestone,
+      milestoneUnlocked
+    };
   } catch (error) {
     console.error('Error updating user streak:', error.message);
+    return { current_streak: 0, longest_streak: 0, last_workout_date: null, isNewMilestone: false, milestoneUnlocked: null };
   }
 }
 
@@ -212,6 +248,28 @@ export async function getProfile(req, res) {
       return res.status(404).json({ message: 'User not found.' });
     }
 
+    // Daily stale streak reset check: if last workout was > 1 day ago, reset current_streak to 0
+    const today = new Date().toISOString().split('T')[0];
+    const lastWorkoutStr = user.last_workout_date || user.last_active_date;
+    let activeStreak = user.current_streak || user.streak_count || 0;
+
+    if (lastWorkoutStr && activeStreak > 0) {
+      const lastDateClean = typeof lastWorkoutStr === 'string' ? lastWorkoutStr.split('T')[0] : new Date(lastWorkoutStr).toISOString().split('T')[0];
+      if (lastDateClean !== today) {
+        const lastDate = new Date(lastDateClean);
+        const currentDate = new Date(today);
+        const diffTime = Math.abs(currentDate - lastDate);
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays > 1) {
+          activeStreak = 0;
+          user.current_streak = 0;
+          user.streak_count = 0;
+          await user.save();
+        }
+      }
+    }
+
     let dietName = null;
     if (user.current_diet_id) {
       const diet = await DietPlan.findOne({ diet_id: user.current_diet_id });
@@ -231,7 +289,11 @@ export async function getProfile(req, res) {
         height: user.height,
         weight: user.weight,
         goal_type: user.goal_type,
-        streak_count: user.streak_count,
+        current_streak: activeStreak,
+        streak_count: activeStreak,
+        longest_streak: user.longest_streak || activeStreak,
+        last_workout_date: user.last_workout_date || null,
+        streak_milestones: user.streak_milestones || [],
         water_goal_ml: user.water_goal_ml,
         current_diet_id: user.current_diet_id,
         diet_name: dietName,
