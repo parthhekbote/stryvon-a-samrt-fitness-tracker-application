@@ -15,6 +15,7 @@ import {
   X 
 } from 'lucide-react';
 import StryvonLogo from './StryvonLogo';
+import AppAmbientBackground from './AppAmbientBackground';
 import { usePrefersReducedMotion, motionVariants, tapScaleProps } from '../utils/animationPresets';
 
 export default function Layout({ user, onLogout, darkMode, setDarkMode }) {
@@ -162,8 +163,9 @@ export default function Layout({ user, onLogout, darkMode, setDarkMode }) {
         </div>
       </aside>
 
-      {/* Main Content Area with Route Transition */}
-      <main className="flex-1 overflow-y-auto min-h-screen p-4 sm:p-6 md:p-10 pb-24 md:pb-10 bg-[#0A0A0A]">
+      {/* Main Content Area with Route Transition & Ambient Motion Graphic */}
+      <main className="flex-1 overflow-y-auto min-h-screen p-4 sm:p-6 md:p-10 pb-24 md:pb-10 bg-[#0A0A0A] relative overflow-hidden">
+        <AppAmbientBackground />
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}

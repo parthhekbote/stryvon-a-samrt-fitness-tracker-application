@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import SplashScreen from './components/SplashScreen';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 import Layout from './components/Layout';
 import LoginRegister from './pages/LoginRegister';
 import Dashboard from './pages/Dashboard';
@@ -65,6 +66,7 @@ export default function App() {
       </AnimatePresence>
 
       <Router>
+        <PWAInstallPrompt />
         <Routes>
           {/* Public auth route */}
           <Route 
