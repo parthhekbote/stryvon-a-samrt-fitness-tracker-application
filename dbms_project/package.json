@@ -5,8 +5,16 @@
   "scripts": {
     "dev": "npx concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "dev:server": "npm run dev --prefix backend",
-    "build": "npm run build --prefix frontend",
+    "build": "cd frontend && npm install && npx vite build",
     "start": "cd backend && node index.js",
     "start:server": "npm run start --prefix backend"
+  },
+  "dependencies": {
+    "vite": "^8.0.12",
+    "@vitejs/plugin-react": "^6.0.1",
+    "express": "^4.19.2",
+    "mongoose": "^9.10.1",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
   }
 }
