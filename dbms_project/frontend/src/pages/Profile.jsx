@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { 
   User, 
   Award, 
@@ -9,7 +10,8 @@ import {
   Check, 
   ShieldAlert, 
   Activity, 
-  Heart 
+  Heart,
+  Loader2
 } from 'lucide-react';
 
 export default function Profile({ apiUrl, token, onLogout, onUpdateUser }) {
@@ -27,6 +29,8 @@ export default function Profile({ apiUrl, token, onLogout, onUpdateUser }) {
   const [waterGoal, setWaterGoal] = useState('');
   const [dietId, setDietId] = useState('');
   
+  const [saving, setSaving] = useState(false);
+  const [savedSuccess, setSavedSuccess] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
 
@@ -69,6 +73,8 @@ export default function Profile({ apiUrl, token, onLogout, onUpdateUser }) {
     e.preventDefault();
     setSuccess(false);
     setError('');
+    setSaving(true);
+    setSavedSuccess(false);
 
     let parsedDietId = null;
     if (dietId !== '' && dietId !== null && dietId !== undefined) {
@@ -99,6 +105,8 @@ export default function Profile({ apiUrl, token, onLogout, onUpdateUser }) {
 
       if (response.ok) {
         setSuccess(true);
+        setSavedSuccess(true);
+        setTimeout(() => setSavedSuccess(false), 4000);
         
         // Update local storage and notify parent App/Layout state
         const storedUser = localStorage.getItem('user');
@@ -121,6 +129,8 @@ export default function Profile({ apiUrl, token, onLogout, onUpdateUser }) {
       }
     } catch (err) {
       setError(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -260,13 +270,37 @@ export default function Profile({ apiUrl, token, onLogout, onUpdateUser }) {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-4 border-t border-[#474747]/40">
-              <button
+              <motion.button
+                whileTap={{ scale: 0.97 }}
                 type="submit"
-                className="flex-1 bg-[#D4FF00] hover:bg-[#b8de00] text-black font-display font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider shadow-md min-h-[44px]"
+                disabled={saving}
+                className={`flex-1 ${
+                  savedSuccess
+                    ? 'bg-[#D4FF00] text-black font-extrabold shadow-[0_0_20px_rgba(212,255,0,0.5)]'
+                    : 'bg-[#D4FF00] hover:bg-[#b8de00] text-black font-bold'
+                } py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs uppercase tracking-wider shadow-md min-h-[44px] disabled:opacity-75`}
               >
-                <Check size={16} />
-                Save Profile Parameters
-              </button>
+                {saving ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>SAVING PARAMETERS...</span>
+                  </>
+                ) : savedSuccess ? (
+                  <motion.span 
+                    initial={{ scale: 0.8, opacity: 0 }} 
+                    animate={{ scale: 1, opacity: 1 }} 
+                    className="flex items-center gap-1.5 font-extrabold"
+                  >
+                    <Check size={16} className="stroke-[3]" />
+                    PREFERENCES SAVED SUCCESSFULLY!
+                  </motion.span>
+                ) : (
+                  <>
+                    <Check size={16} />
+                    SAVE PROFILE PARAMETERS
+                  </>
+                )}
+              </motion.button>
               <button
                 type="button"
                 onClick={onLogout}
