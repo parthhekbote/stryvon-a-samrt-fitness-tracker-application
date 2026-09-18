@@ -361,34 +361,13 @@ export default function LoginRegister({ onLogin, apiUrl }) {
       <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 lg:p-16 overflow-y-auto bg-[#0A0A0A] relative overflow-hidden">
         
         {/* Layer 1 (Deepest): Slow-moving ambient glow/gradient blob behind sign-in form */}
-        <motion.div 
-          animate={
-            prefersReducedMotion 
-              ? {} 
-              : { 
-                  x: [0, 45, -35, 0],
-                  y: [0, -55, 35, 0],
-                  scale: [1, 1.18, 0.88, 1],
-                  opacity: [0.12, 0.22, 0.12]
-                }
-          }
-          transition={{ duration: 19, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-1/4 right-1/4 w-80 sm:w-[28rem] h-80 sm:h-[28rem] bg-[#D4FF00]/15 rounded-full blur-[130px] pointer-events-none z-0" 
+        <div 
+          className="ambient-glow-orb-1 absolute top-1/4 right-1/4 w-72 sm:w-[28rem] h-72 sm:h-[28rem] bg-[#D4FF00]/15 rounded-full blur-[80px] sm:blur-[130px] pointer-events-none z-0" 
         />
 
         {/* Layer 2C: Faint Ambient Orb at Bottom-Right of Form Container */}
-        <motion.div 
-          animate={
-            prefersReducedMotion 
-              ? {} 
-              : { 
-                  x: [0, -40, 25, 0],
-                  y: [0, -35, 45, 0],
-                  opacity: [0.06, 0.15, 0.06]
-                }
-          }
-          transition={{ duration: 21, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-          className="absolute bottom-10 right-10 w-64 h-64 bg-[#D4FF00]/10 rounded-full blur-[110px] pointer-events-none z-0" 
+        <div 
+          className="ambient-glow-orb-2 absolute bottom-10 right-10 w-60 h-60 bg-[#D4FF00]/10 rounded-full blur-[70px] sm:blur-[110px] pointer-events-none z-0" 
         />
 
         {/* Mobile Ambient SVG Motion Mesh — floating neon energy ring background for mobile phones */}

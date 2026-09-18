@@ -335,7 +335,56 @@ body.dark textarea::placeholder {
 
 .orbit-arc {
   transform-origin: 300px 300px;
+  transform-box: fill-box;
   will-change: transform;
+  transform: translateZ(0);
+}
+
+/* --- GPU-Accelerated Hardware Composited Ambient Orbs --- */
+.ambient-glow-orb-1 {
+  will-change: transform;
+  transform: translateZ(0);
+  animation: gpu-orb-drift-1 22s ease-in-out infinite alternate;
+}
+
+.ambient-glow-orb-2 {
+  will-change: transform;
+  transform: translateZ(0);
+  animation: gpu-orb-drift-2 26s ease-in-out infinite alternate;
+}
+
+@keyframes gpu-orb-drift-1 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(30px, -35px, 0) scale(1.1);
+  }
+  100% {
+    transform: translate3d(-20px, 20px, 0) scale(0.95);
+  }
+}
+
+@keyframes gpu-orb-drift-2 {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.95);
+  }
+  50% {
+    transform: translate3d(-25px, 30px, 0) scale(1.08);
+  }
+  100% {
+    transform: translate3d(20px, -20px, 0) scale(1);
+  }
+}
+
+/* Mobile GPU optimization: bypass CPU re-rasterization of SVG feGaussianBlur filters on phones */
+@media (max-width: 768px) {
+  .orbit-arc,
+  .orbital-dot,
+  .core-disc,
+  .core-dot {
+    filter: none !important;
+  }
 }
 
 /* Outer ring — slow majestic clockwise */
