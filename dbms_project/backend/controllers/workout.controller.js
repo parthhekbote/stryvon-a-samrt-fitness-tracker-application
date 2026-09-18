@@ -24,15 +24,21 @@ export async function getWorkouts(req, res) {
       .sort({ workout_id: 1 })
       .lean();
 
-    const workoutsWithCount = await Promise.all(
-      workouts.map(async (workout) => {
-        const count = await WorkoutExercise.countDocuments({ workout_id: workout.workout_id });
-        return {
-          ...workout,
-          exercise_count: count
-        };
-      })
-    );
+    const workoutIds = workouts.map(w => w.workout_id);
+    const exerciseCounts = await WorkoutExercise.aggregate([
+      { $match: { workout_id: { $in: workoutIds } } },
+      { $group: { _id: '$workout_id', count: { $sum: 1 } } }
+    ]);
+
+    const countMap = {};
+    exerciseCounts.forEach(item => {
+      countMap[item._id] = item.count;
+    });
+
+    const workoutsWithCount = workouts.map(workout => ({
+      ...workout,
+      exercise_count: countMap[workout.workout_id] || 0
+    }));
 
     res.status(200).json({ workouts: workoutsWithCount });
   } catch (error) {
@@ -49,14 +55,24 @@ export async function createWorkout(req, res) {
     return res.status(400).json({ message: 'Workout name, duration, and calories are required.' });
   }
 
+  const parsedDuration = parseInt(duration);
+  const parsedCalories = parseInt(calories_burned);
+
+  if (isNaN(parsedDuration) || parsedDuration < 1 || parsedDuration > 600) {
+    return res.status(400).json({ message: 'Duration must be between 1 and 600 minutes.' });
+  }
+  if (isNaN(parsedCalories) || parsedCalories < 0 || parsedCalories > 5000) {
+    return res.status(400).json({ message: 'Calories burned must be between 0 and 5000 kcal.' });
+  }
+
   try {
     const workoutId = await getNextSequenceValue('workout_id');
 
     await Workout.create({
       workout_id: workoutId,
-      workout_name,
-      duration,
-      calories_burned,
+      workout_name: String(workout_name).trim(),
+      duration: parsedDuration,
+      calories_burned: parsedCalories,
       difficulty: difficulty || 'Beginner',
       equipment_needed: equipment_needed || 'None',
       user_id: userId
@@ -65,13 +81,15 @@ export async function createWorkout(req, res) {
     if (exercises && Array.isArray(exercises)) {
       for (let i = 0; i < exercises.length; i++) {
         const item = exercises[i];
-        await WorkoutExercise.create({
-          workout_id: workoutId,
-          exercise_id: item.exercise_id,
-          sequence_order: i + 1,
-          default_sets: item.sets || 3,
-          default_reps: item.reps || 10
-        });
+        if (item && item.exercise_id) {
+          await WorkoutExercise.create({
+            workout_id: workoutId,
+            exercise_id: item.exercise_id,
+            sequence_order: i + 1,
+            default_sets: item.sets || 3,
+            default_reps: item.reps || 10
+          });
+        }
       }
     }
 
@@ -84,23 +102,40 @@ export async function createWorkout(req, res) {
 
 export async function getWorkoutExercises(req, res) {
   const { id } = req.params;
+  const userId = req.user.userId;
+  const workoutId = parseInt(id);
+
+  if (isNaN(workoutId)) {
+    return res.status(400).json({ message: 'Invalid workout ID.' });
+  }
 
   try {
-    const workoutExs = await WorkoutExercise.find({ workout_id: parseInt(id) })
+    const workout = await Workout.findOne({ workout_id: workoutId }).lean();
+    if (workout && workout.user_id !== null && workout.user_id !== userId) {
+      return res.status(403).json({ message: 'Unauthorized access to private workout.' });
+    }
+
+    const workoutExs = await WorkoutExercise.find({ workout_id: workoutId })
       .sort({ sequence_order: 1 })
       .lean();
 
-    const exercises = await Promise.all(
-      workoutExs.map(async (we) => {
-        const ex = await Exercise.findOne({ exercise_id: we.exercise_id }).lean();
-        return {
-          ...ex,
-          sequence_order: we.sequence_order,
-          default_sets: we.default_sets,
-          default_reps: we.default_reps
-        };
-      })
-    );
+    const exerciseIds = workoutExs.map(we => we.exercise_id);
+    const exerciseDocs = await Exercise.find({ exercise_id: { $in: exerciseIds } }).lean();
+
+    const exerciseMap = {};
+    exerciseDocs.forEach(ex => {
+      exerciseMap[ex.exercise_id] = ex;
+    });
+
+    const exercises = workoutExs.map(we => {
+      const ex = exerciseMap[we.exercise_id] || {};
+      return {
+        ...ex,
+        sequence_order: we.sequence_order,
+        default_sets: we.default_sets,
+        default_reps: we.default_reps
+      };
+    });
 
     res.status(200).json({ exercises });
   } catch (error) {
@@ -114,26 +149,29 @@ export async function logWorkoutCompletion(req, res) {
   const { workout_id, workout_day_id, custom_name, is_custom, muscle_groups, duration, calories_burned, sets, completed_exercises } = req.body;
 
   const validDuration = duration ? parseInt(duration) : 45;
+  if (isNaN(validDuration) || validDuration < 1 || validDuration > 600) {
+    return res.status(400).json({ message: 'Duration must be between 1 and 600 minutes.' });
+  }
 
   try {
     const parsedWorkoutId = (workout_id && !isNaN(parseInt(workout_id))) ? parseInt(workout_id) : null;
     const parsedWorkoutDayId = (workout_day_id && !isNaN(parseInt(workout_day_id))) ? parseInt(workout_day_id) : null;
 
-    let finalCalories = calories_burned;
+    let finalCalories = calories_burned ? parseInt(calories_burned) : null;
 
-    if (!finalCalories) {
+    if (!finalCalories || isNaN(finalCalories) || finalCalories < 0 || finalCalories > 5000) {
       if (parsedWorkoutId) {
         const workoutExercises = await WorkoutExercise.find({ workout_id: parsedWorkoutId }).lean();
         if (workoutExercises.length > 0) {
           const exerciseIds = workoutExercises.map(e => e.exercise_id);
           const exercisesData = await Exercise.find({ exercise_id: { $in: exerciseIds } });
           const sumCaloriesPerMin = exercisesData.reduce((sum, ex) => sum + parseFloat(ex.calories_per_minute || 5.0), 0);
-          const averageBurnRate = sumCaloriesPerMin / exercisesData.length;
+          const averageBurnRate = exercisesData.length > 0 ? (sumCaloriesPerMin / exercisesData.length) : 5.0;
           finalCalories = Math.round(averageBurnRate * validDuration);
         } else {
           finalCalories = Math.round(5.0 * validDuration);
         }
-      } else if (sets && sets.length > 0) {
+      } else if (sets && Array.isArray(sets) && sets.length > 0) {
         const setExIds = sets.map(s => s.exercise_id).filter(Boolean);
         const exercisesData = await Exercise.find({ exercise_id: { $in: setExIds } });
         if (exercisesData.length > 0) {
@@ -148,26 +186,23 @@ export async function logWorkoutCompletion(req, res) {
       }
     }
 
-    // Infer muscle groups if custom or missing
     let finalMuscleGroups = muscle_groups || [];
     if (!finalMuscleGroups || finalMuscleGroups.length === 0) {
       const mgSet = new Set();
       if (sets && Array.isArray(sets)) {
-        for (const s of sets) {
-          const ex = await Exercise.findOne({ exercise_id: s.exercise_id }).lean();
-          if (ex) {
-            if (ex.muscle_group) mgSet.add(ex.muscle_group.toLowerCase());
-            if (ex.muscle_groups && Array.isArray(ex.muscle_groups)) {
-              ex.muscle_groups.forEach(m => mgSet.add(m.toLowerCase()));
-            }
+        const setExIds = sets.map(s => s.exercise_id).filter(Boolean);
+        const setExercises = await Exercise.find({ exercise_id: { $in: setExIds } }).lean();
+        setExercises.forEach(ex => {
+          if (ex.muscle_group) mgSet.add(ex.muscle_group.toLowerCase());
+          if (ex.muscle_groups && Array.isArray(ex.muscle_groups)) {
+            ex.muscle_groups.forEach(m => mgSet.add(m.toLowerCase()));
           }
-        }
+        });
       }
       finalMuscleGroups = Array.from(mgSet);
     }
 
     const userWorkoutId = await getNextSequenceValue('user_workout_id');
-
     const completedExList = Array.isArray(completed_exercises) ? completed_exercises : [];
 
     await UserWorkout.create({
@@ -185,22 +220,28 @@ export async function logWorkoutCompletion(req, res) {
     });
 
     if (sets && Array.isArray(sets) && sets.length > 0) {
+      const setToInsert = [];
       for (const set of sets) {
-        const setId = await getNextSequenceValue('set_id');
-        await WorkoutSet.create({
-          set_id: setId,
-          user_workout_id: userWorkoutId,
-          exercise_id: set.exercise_id,
-          set_number: set.set_number,
-          reps: set.reps,
-          weight: set.weight
-        });
+        if (set && set.exercise_id) {
+          const setId = await getNextSequenceValue('set_id');
+          setToInsert.push({
+            set_id: setId,
+            user_workout_id: userWorkoutId,
+            exercise_id: parseInt(set.exercise_id),
+            set_number: parseInt(set.set_number) || 1,
+            reps: parseInt(set.reps) || 0,
+            weight: parseFloat(set.weight) || 0
+          });
+        }
+      }
+      if (setToInsert.length > 0) {
+        await WorkoutSet.insertMany(setToInsert);
       }
     }
 
     const streakData = await updateStreak(userId, req.body.user_date);
 
-    // Update progress table's calories_burned for today
+    // Increment today's progress table calories_burned without changing manual/profile weight source
     const today = req.body.user_date || new Date().toISOString().split('T')[0];
     const user = await User.findOne({ user_id: userId });
     const userWeight = user?.weight || 70.0;
@@ -220,11 +261,11 @@ export async function logWorkoutCompletion(req, res) {
         bmi,
         body_fat: 0.0,
         calories_burned: finalCalories,
-        recorded_at: today
+        recorded_at: today,
+        source: 'workout'
       });
     }
 
-    // Award badges
     const totalWorkouts = await UserWorkout.countDocuments({ user_id: userId });
     if (totalWorkouts === 1) {
       await awardBadge(userId, 'First Workout Completed!');
@@ -258,55 +299,75 @@ async function awardBadge(userId, badgeName) {
 
 export async function getWorkoutHistory(req, res) {
   const userId = req.user.userId;
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 50));
+  const skip = (page - 1) * limit;
 
   try {
+    const total = await UserWorkout.countDocuments({ user_id: userId });
     const history = await UserWorkout.find({ user_id: userId })
       .sort({ logged_at: -1 })
+      .skip(skip)
+      .limit(limit)
       .lean();
 
-    const fullHistory = await Promise.all(
-      history.map(async (log) => {
-        const workout = await Workout.findOne({ workout_id: log.workout_id }).lean();
-        const rawSets = await WorkoutSet.find({ user_workout_id: log.user_workout_id })
-          .sort({ exercise_id: 1, set_number: 1 })
-          .lean();
+    const userWorkoutIds = history.map(h => h.user_workout_id);
+    const workoutIds = history.map(h => h.workout_id).filter(Boolean);
 
-        const sets = await Promise.all(
-          rawSets.map(async (ws) => {
-            const ex = await Exercise.findOne({ exercise_id: ws.exercise_id }).lean();
-            return {
-              set_number: ws.set_number,
-              reps: ws.reps,
-              weight: ws.weight,
-              exercise_name: ex?.exercise_name || 'Exercise',
-              muscle_group: ex?.muscle_group || 'General'
-            };
-          })
-        );
+    const [workouts, rawSets] = await Promise.all([
+      Workout.find({ workout_id: { $in: workoutIds } }).lean(),
+      WorkoutSet.find({ user_workout_id: { $in: userWorkoutIds } }).sort({ exercise_id: 1, set_number: 1 }).lean()
+    ]);
 
-        return {
-          user_workout_id: log.user_workout_id,
-          logged_at: log.logged_at,
-          actual_duration: log.actual_duration,
-          actual_calories_burned: log.actual_calories_burned,
-          workout_name: log.custom_name || workout?.workout_name || (log.is_custom ? 'Freestyle Session' : 'Workout'),
-          difficulty: workout?.difficulty || 'Intermediate',
-          is_custom: log.is_custom,
-          muscle_groups: log.muscle_groups,
-          completed_exercises: log.completed_exercises || [],
-          sets
-        };
-      })
-    );
+    const workoutMap = {};
+    workouts.forEach(w => { workoutMap[w.workout_id] = w; });
 
-    res.status(200).json({ history: fullHistory });
+    const setExerciseIds = rawSets.map(s => s.exercise_id);
+    const exercises = await Exercise.find({ exercise_id: { $in: setExerciseIds } }).lean();
+    const exerciseMap = {};
+    exercises.forEach(ex => { exerciseMap[ex.exercise_id] = ex; });
+
+    const setsByWorkoutId = {};
+    rawSets.forEach(ws => {
+      if (!setsByWorkoutId[ws.user_workout_id]) setsByWorkoutId[ws.user_workout_id] = [];
+      const ex = exerciseMap[ws.exercise_id];
+      setsByWorkoutId[ws.user_workout_id].push({
+        set_number: ws.set_number,
+        reps: ws.reps,
+        weight: ws.weight,
+        exercise_name: ex?.exercise_name || 'Exercise',
+        muscle_group: ex?.muscle_group || 'General'
+      });
+    });
+
+    const fullHistory = history.map(log => {
+      const workout = workoutMap[log.workout_id];
+      return {
+        user_workout_id: log.user_workout_id,
+        logged_at: log.logged_at,
+        actual_duration: log.actual_duration,
+        actual_calories_burned: log.actual_calories_burned,
+        workout_name: log.custom_name || workout?.workout_name || (log.is_custom ? 'Freestyle Session' : 'Workout'),
+        difficulty: workout?.difficulty || 'Intermediate',
+        is_custom: log.is_custom,
+        muscle_groups: log.muscle_groups,
+        completed_exercises: log.completed_exercises || [],
+        sets: setsByWorkoutId[log.user_workout_id] || []
+      };
+    });
+
+    res.status(200).json({
+      history: fullHistory,
+      total,
+      page,
+      limit,
+      hasMore: (skip + fullHistory.length) < total
+    });
   } catch (error) {
     console.error('Failed to fetch workout history:', error);
     res.status(500).json({ message: 'Failed to retrieve workout logs.' });
   }
 }
-
-// ---------------------- PROGRAM & SCHEDULING CONTROLLERS ----------------------
 
 export async function backfillExerciseMuscleGroups() {
   try {
@@ -315,7 +376,6 @@ export async function backfillExerciseMuscleGroups() {
       return;
     }
 
-    // Ensure common abs exercises exist in database
     const presetAbs = [
       { exercise_name: 'Abdominal Crunches', muscle_group: 'Abs', muscle_groups: ['abs', 'core'], difficulty: 'Beginner', calories_per_minute: 5.0 },
       { exercise_name: 'Plank Hold', muscle_group: 'Abs', muscle_groups: ['abs', 'core'], difficulty: 'Beginner', calories_per_minute: 4.5 },
@@ -363,17 +423,19 @@ export async function getPrograms(req, res) {
       $or: [{ user_id: null }, { user_id: userId }]
     }).sort({ program_id: 1 }).lean();
 
-    const result = await Promise.all(
-      programs.map(async (prog) => {
-        const days = await WorkoutDay.find({ program_id: prog.program_id })
-          .sort({ order_index: 1 })
-          .lean();
-        return {
-          ...prog,
-          days
-        };
-      })
-    );
+    const programIds = programs.map(p => p.program_id);
+    const allDays = await WorkoutDay.find({ program_id: { $in: programIds } }).sort({ order_index: 1 }).lean();
+
+    const daysByProgram = {};
+    allDays.forEach(d => {
+      if (!daysByProgram[d.program_id]) daysByProgram[d.program_id] = [];
+      daysByProgram[d.program_id].push(d);
+    });
+
+    const result = programs.map(prog => ({
+      ...prog,
+      days: daysByProgram[prog.program_id] || []
+    }));
 
     res.status(200).json({ programs: result });
   } catch (error) {
@@ -390,9 +452,10 @@ export async function createProgram(req, res) {
     return res.status(400).json({ message: 'Program name is required.' });
   }
 
+  const active = is_active ?? true;
+
   try {
-    // If setting is_active to true, deactivate all other user programs
-    if (is_active) {
+    if (active) {
       await Program.updateMany({ user_id: userId }, { is_active: false });
     }
 
@@ -400,9 +463,9 @@ export async function createProgram(req, res) {
     const newProgram = await Program.create({
       program_id: programId,
       user_id: userId,
-      program_name,
+      program_name: String(program_name).trim(),
       schedule_mode: schedule_mode || 'rotating',
-      is_active: is_active ?? true
+      is_active: active
     });
 
     if (days && Array.isArray(days)) {
@@ -431,18 +494,24 @@ export async function createProgram(req, res) {
 export async function activateProgram(req, res) {
   const userId = req.user.userId;
   const { id } = req.params;
+  const programId = parseInt(id);
+
+  if (isNaN(programId)) {
+    return res.status(400).json({ message: 'Invalid program ID.' });
+  }
 
   try {
+    const existing = await Program.findOne({ program_id: programId, user_id: userId });
+    if (!existing) {
+      return res.status(404).json({ message: 'Program not found or access denied.' });
+    }
+
     await Program.updateMany({ user_id: userId }, { is_active: false });
     const updated = await Program.findOneAndUpdate(
-      { program_id: parseInt(id), user_id: userId },
+      { program_id: programId, user_id: userId },
       { is_active: true },
       { new: true }
     );
-
-    if (!updated) {
-      return res.status(404).json({ message: 'Program not found.' });
-    }
 
     res.status(200).json({ message: 'Program activated successfully.', program: updated });
   } catch (error) {
@@ -456,10 +525,7 @@ export async function getTodaySuggestedWorkout(req, res) {
   const { weekday } = req.query;
 
   try {
-    // Find active program for user
     let activeProgram = await Program.findOne({ user_id: userId, is_active: true }).lean();
-
-    // If no active program, check if any user program exists
     if (!activeProgram) {
       activeProgram = await Program.findOne({ user_id: userId }).lean();
     }
@@ -469,7 +535,6 @@ export async function getTodaySuggestedWorkout(req, res) {
     }
 
     const days = await WorkoutDay.find({ program_id: activeProgram.program_id }).sort({ order_index: 1 }).lean();
-
     if (days.length === 0) {
       return res.status(200).json({ suggested: null, isRestDay: false, program: activeProgram, message: 'Program has no workout days.' });
     }
@@ -478,28 +543,23 @@ export async function getTodaySuggestedWorkout(req, res) {
     let isRestDay = false;
 
     const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDayIndex = new Date().getDay(); // 0 = Sunday, 1 = Monday ... 4 = Thursday
+    const currentDayIndex = new Date().getDay();
     const targetWeekday = (weekday && typeof weekday === 'string')
       ? weekday.trim().toLowerCase()
       : weekdays[currentDayIndex].toLowerCase();
 
-    // 1. Try matching by fixed_weekday field (e.g., 'Thursday')
     suggestedDay = days.find(d => 
       d.fixed_weekday && d.fixed_weekday.trim().toLowerCase() === targetWeekday
     ) || null;
 
-    // 2. If no fixed_weekday match, check if schedule_mode is 'fixed'
     if (activeProgram.schedule_mode === 'fixed') {
       if (!suggestedDay) {
-        // Also check if day name itself contains the weekday name (e.g., "Thursday Workout")
         suggestedDay = days.find(d => d.name && d.name.toLowerCase().includes(targetWeekday)) || null;
       }
       if (!suggestedDay) {
         isRestDay = true;
       }
     } else if (!suggestedDay) {
-      // 3. Check if order_index matches current weekday (1=Monday ... 7=Sunday)
-      // Monday = index 1, Tuesday = 2, Wednesday = 3, Thursday = 4, Friday = 5, Saturday = 6, Sunday = 7
       const weekdayOrderMap = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7 };
       const todayOrder = weekdayOrderMap[currentDayIndex];
       const matchedByOrder = days.find(d => d.order_index === todayOrder);
@@ -507,7 +567,6 @@ export async function getTodaySuggestedWorkout(req, res) {
       if (matchedByOrder) {
         suggestedDay = matchedByOrder;
       } else {
-        // 4. Fallback to Rotating mode (oldest logged day)
         const dayLogs = await Promise.all(
           days.map(async (day) => {
             const lastLog = await UserWorkout.findOne({
@@ -533,7 +592,6 @@ export async function getTodaySuggestedWorkout(req, res) {
       }
     }
 
-    // Attach exercises if workout_id is linked, or find matching exercises by target muscle groups
     let exercises = [];
     if (suggestedDay) {
       if (suggestedDay.workout_id) {
@@ -541,17 +599,17 @@ export async function getTodaySuggestedWorkout(req, res) {
           .sort({ sequence_order: 1 })
           .lean();
 
-        exercises = await Promise.all(
-          workoutExs.map(async (we) => {
-            const ex = await Exercise.findOne({ exercise_id: we.exercise_id }).lean();
-            return {
-              ...ex,
-              sequence_order: we.sequence_order,
-              default_sets: we.default_sets,
-              default_reps: we.default_reps
-            };
-          })
-        );
+        const exIds = workoutExs.map(we => we.exercise_id);
+        const exDocs = await Exercise.find({ exercise_id: { $in: exIds } }).lean();
+        const exMap = {};
+        exDocs.forEach(e => { exMap[e.exercise_id] = e; });
+
+        exercises = workoutExs.map(we => ({
+          ...exMap[we.exercise_id],
+          sequence_order: we.sequence_order,
+          default_sets: we.default_sets,
+          default_reps: we.default_reps
+        }));
       } else {
         const targetTags = new Set();
         if (suggestedDay.muscle_groups && Array.isArray(suggestedDay.muscle_groups)) {
@@ -562,9 +620,6 @@ export async function getTodaySuggestedWorkout(req, res) {
         if (dayNameLower.includes('pull')) { ['back', 'biceps'].forEach(m => targetTags.add(m)); }
         if (dayNameLower.includes('leg')) { ['legs', 'quads', 'glutes', 'hamstrings', 'calves'].forEach(m => targetTags.add(m)); }
         if (dayNameLower.includes('abs') || dayNameLower.includes('core')) { ['abs', 'core'].forEach(m => targetTags.add(m)); }
-        if (dayNameLower.includes('chest')) { targetTags.add('chest'); }
-        if (dayNameLower.includes('shoulder')) { targetTags.add('shoulders'); }
-        if (dayNameLower.includes('arm')) { ['biceps', 'triceps'].forEach(m => targetTags.add(m)); }
 
         const tagsArr = Array.from(targetTags);
         if (tagsArr.length > 0) {
@@ -601,7 +656,6 @@ export async function getMuscleGroupStatus(req, res) {
   const userId = req.user.userId;
 
   try {
-    // 1. Get active program to identify target muscle groups
     let targetMuscleGroups = new Set();
     const activeProgram = await Program.findOne({ user_id: userId, is_active: true }).lean();
 
@@ -614,58 +668,67 @@ export async function getMuscleGroupStatus(req, res) {
       });
     }
 
-    // Default fallback muscle groups if program has none
     if (targetMuscleGroups.size === 0) {
       ['chest', 'back', 'legs', 'shoulders', 'arms', 'core'].forEach(m => targetMuscleGroups.add(m));
     }
 
-    // 2. Scan ALL UserWorkout logs for this user across all history
     const allUserLogs = await UserWorkout.find({ user_id: userId }).sort({ logged_at: -1 }).lean();
+    const userWorkoutIds = allUserLogs.map(l => l.user_workout_id);
+
+    const allSets = await WorkoutSet.find({ user_workout_id: { $in: userWorkoutIds } }).lean();
+    const exerciseIds = allSets.map(s => s.exercise_id);
+    const exercises = await Exercise.find({ exercise_id: { $in: exerciseIds } }).lean();
+
+    const exerciseMap = {};
+    exercises.forEach(ex => { exerciseMap[ex.exercise_id] = ex; });
+
+    const setsByWorkoutId = {};
+    allSets.forEach(s => {
+      if (!setsByWorkoutId[s.user_workout_id]) setsByWorkoutId[s.user_workout_id] = [];
+      setsByWorkoutId[s.user_workout_id].push(s);
+    });
+
     const now = new Date();
 
-    const statusList = await Promise.all(
-      Array.from(targetMuscleGroups).map(async (mg) => {
-        let lastTrainedDate = null;
+    const statusList = Array.from(targetMuscleGroups).map(mg => {
+      let lastTrainedDate = null;
 
-        for (const log of allUserLogs) {
-          // Check if log explicitly has this muscle group
-          let hasMg = log.muscle_groups && log.muscle_groups.some(m => m.toLowerCase() === mg);
-          
-          if (!hasMg) {
-            // Infer from workout sets exercises
-            const sets = await WorkoutSet.find({ user_workout_id: log.user_workout_id }).lean();
-            for (const s of sets) {
-              const ex = await Exercise.findOne({ exercise_id: s.exercise_id }).lean();
-              if (ex) {
-                const exMg = (ex.muscle_group || '').toLowerCase();
-                const exMgs = (ex.muscle_groups || []).map(m => m.toLowerCase());
-                if (exMg === mg || exMgs.includes(mg)) {
-                  hasMg = true;
-                  break;
-                }
+      for (const log of allUserLogs) {
+        let hasMg = log.muscle_groups && log.muscle_groups.some(m => m.toLowerCase() === mg);
+        
+        if (!hasMg) {
+          const sets = setsByWorkoutId[log.user_workout_id] || [];
+          for (const s of sets) {
+            const ex = exerciseMap[s.exercise_id];
+            if (ex) {
+              const exMg = (ex.muscle_group || '').toLowerCase();
+              const exMgs = (ex.muscle_groups || []).map(m => m.toLowerCase());
+              if (exMg === mg || exMgs.includes(mg)) {
+                hasMg = true;
+                break;
               }
             }
           }
-
-          if (hasMg) {
-            lastTrainedDate = new Date(log.logged_at);
-            break;
-          }
         }
 
-        if (!lastTrainedDate) {
-          return { muscleGroup: mg, daysAgo: null, label: 'Not trained yet' };
+        if (hasMg) {
+          lastTrainedDate = new Date(log.logged_at);
+          break;
         }
+      }
 
-        const diffTime = Math.abs(now - lastTrainedDate);
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        let label = `${diffDays} days ago`;
-        if (diffDays === 0) label = 'Today';
-        else if (diffDays === 1) label = 'Yesterday';
+      if (!lastTrainedDate) {
+        return { muscleGroup: mg, daysAgo: null, label: 'Not trained yet' };
+      }
 
-        return { muscleGroup: mg, daysAgo: diffDays, label };
-      })
-    );
+      const diffTime = Math.abs(now - lastTrainedDate);
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      let label = `${diffDays} days ago`;
+      if (diffDays === 0) label = 'Today';
+      else if (diffDays === 1) label = 'Yesterday';
+
+      return { muscleGroup: mg, daysAgo: diffDays, label };
+    });
 
     res.status(200).json({ status: statusList });
   } catch (error) {

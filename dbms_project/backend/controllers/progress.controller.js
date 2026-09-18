@@ -17,6 +17,11 @@ export async function logProgress(req, res) {
     return res.status(400).json({ message: 'Weight is required.' });
   }
 
+  const parsedWeight = parseFloat(weight);
+  if (isNaN(parsedWeight) || parsedWeight < 20 || parsedWeight > 500) {
+    return res.status(400).json({ message: 'Weight must be between 20 kg and 500 kg.' });
+  }
+
   const logDate = recorded_at || new Date().toISOString().split('T')[0];
 
   try {
@@ -25,16 +30,42 @@ export async function logProgress(req, res) {
       return res.status(404).json({ message: 'User profile not found.' });
     }
 
+    // 12-hour Cooldown Check for manual weight logs
+    const lastManualProgress = await Progress.findOne({
+      user_id: userId,
+      $or: [{ source: 'manual' }, { source: { $exists: false } }]
+    }).sort({ created_at: -1, _id: -1 });
+
+    const now = new Date();
+    let lastLoggedTime = null;
+
+    if (lastManualProgress && lastManualProgress._id) {
+      lastLoggedTime = lastManualProgress._id.getTimestamp();
+    } else if (user.last_weight_logged_at) {
+      lastLoggedTime = new Date(user.last_weight_logged_at);
+    }
+
+    if (lastLoggedTime) {
+      const diffMs = now.getTime() - lastLoggedTime.getTime();
+      const diffHours = diffMs / (1000 * 60 * 60);
+      if (diffHours < 12) {
+        const remainingHours = Math.ceil(12 - diffHours);
+        return res.status(400).json({
+          message: `Weight can only be logged once every 12 hours. Please wait ${remainingHours} more hour(s).`
+        });
+      }
+    }
+
     const height = user.height;
     let bmi = 0;
     if (height && height > 0) {
       const heightM = height / 100;
-      bmi = parseFloat((weight / (heightM * heightM)).toFixed(2));
+      bmi = parseFloat((parsedWeight / (heightM * heightM)).toFixed(2));
     }
 
-    const existingProgress = await Progress.findOne({ user_id: userId, recorded_at: logDate });
+    const existingProgress = await Progress.findOne({ user_id: userId, recorded_at: logDate, source: 'manual' });
     if (existingProgress) {
-      existingProgress.weight = parseFloat(weight);
+      existingProgress.weight = parsedWeight;
       existingProgress.bmi = bmi;
       if (body_fat !== undefined) existingProgress.body_fat = parseFloat(body_fat);
       await existingProgress.save();
@@ -43,14 +74,17 @@ export async function logProgress(req, res) {
       await Progress.create({
         progress_id: progressId,
         user_id: userId,
-        weight: parseFloat(weight),
+        weight: parsedWeight,
         bmi,
         body_fat: body_fat ? parseFloat(body_fat) : 0,
-        recorded_at: logDate
+        recorded_at: logDate,
+        source: 'manual'
       });
     }
 
-    await User.findOneAndUpdate({ user_id: userId }, { weight: parseFloat(weight) });
+    user.weight = parsedWeight;
+    user.last_weight_logged_at = now;
+    await user.save();
 
     const totalLogs = await Progress.countDocuments({ user_id: userId });
     if (totalLogs === 1) {
@@ -78,13 +112,36 @@ async function awardBadge(userId, badgeName) {
 
 export async function getAnalytics(req, res) {
   const userId = req.user.userId;
+  const daysParam = parseInt(req.query.days || req.query.duration || 30);
+  const daysLimit = !isNaN(daysParam) && daysParam > 0 && daysParam <= 365 ? daysParam : 30;
 
   try {
-    // 1. Fetch weight progress logs (last 30 entries)
-    const weightLogs = await Progress.find({ user_id: userId })
-      .sort({ recorded_at: 1 })
-      .limit(30)
+    // 1. Fetch weight progress logs (excluding workout-generated progress rows)
+    const rawWeightLogs = await Progress.find({
+      user_id: userId,
+      $or: [{ source: { $in: ['manual', 'profile', 'register'] } }, { source: { $exists: false } }]
+    })
+      .sort({ recorded_at: -1 })
+      .limit(daysLimit)
       .lean();
+
+    // Deduplicate weight entries by date, prioritizing manual > profile > register
+    const priorityMap = { manual: 3, profile: 2, register: 1 };
+    const dateDedupped = {};
+
+    rawWeightLogs.forEach(log => {
+      const key = log.recorded_at;
+      const currentSource = log.source || 'manual';
+      const currentPriority = priorityMap[currentSource] || 1;
+
+      if (!dateDedupped[key] || currentPriority > dateDedupped[key].priority) {
+        dateDedupped[key] = { log, priority: currentPriority };
+      }
+    });
+
+    const weightLogs = Object.values(dateDedupped)
+      .map(item => item.log)
+      .sort((a, b) => a.recorded_at.localeCompare(b.recorded_at));
 
     // 2. Fetch calories consumed vs burned history (last 7 days)
     const sevenDaysAgo = new Date();
@@ -141,11 +198,11 @@ export async function getAnalytics(req, res) {
 
     const calorieHistory = Object.values(dateMap);
 
-    // 3. Muscle Group distribution (for Workout Pie Chart)
+    // 3. Muscle Group distribution
     const userWorkouts = await UserWorkout.find({ user_id: userId }).lean();
-    const workoutIds = userWorkouts.map(uw => uw.workout_id);
+    const workoutIds = userWorkouts.map(uw => uw.workout_id).filter(Boolean);
     const workoutExercises = await WorkoutExercise.find({ workout_id: { $in: workoutIds } }).lean();
-    const exerciseIds = workoutExercises.map(we => we.exercise_id);
+    const exerciseIds = workoutExercises.map(we => we.exercise_id).filter(Boolean);
     const exercises = await Exercise.find({ exercise_id: { $in: exerciseIds } }).lean();
 
     const exerciseMap = {};
@@ -166,11 +223,13 @@ export async function getAnalytics(req, res) {
     const weeklyMap = {};
     userWorkouts.forEach(uw => {
       const d = new Date(uw.logged_at);
-      const year = d.getFullYear();
-      const firstJan = new Date(year, 0, 1);
-      const weekNum = Math.ceil((((d - firstJan) / 86400000) + firstJan.getDay() + 1) / 7);
-      const weekKey = `${year}${String(weekNum).padStart(2, '0')}`;
-      weeklyMap[weekKey] = (weeklyMap[weekKey] || 0) + 1;
+      if (!isNaN(d.getTime())) {
+        const year = d.getFullYear();
+        const firstJan = new Date(year, 0, 1);
+        const weekNum = Math.ceil((((d - firstJan) / 86400000) + firstJan.getDay() + 1) / 7);
+        const weekKey = `${year}${String(weekNum).padStart(2, '0')}`;
+        weeklyMap[weekKey] = (weeklyMap[weekKey] || 0) + 1;
+      }
     });
 
     const weeklyFreq = Object.keys(weeklyMap)
@@ -197,7 +256,10 @@ export async function getPdfReportData(req, res) {
     const user = await User.findOne({ user_id: userId }).lean();
     const workouts = await UserWorkout.find({ user_id: userId }).lean();
     const meals = await MealLog.find({ user_id: userId }).lean();
-    const weightHistory = await Progress.find({ user_id: userId })
+    const weightHistory = await Progress.find({
+      user_id: userId,
+      $or: [{ source: { $in: ['manual', 'profile', 'register'] } }, { source: { $exists: false } }]
+    })
       .sort({ recorded_at: -1 })
       .limit(10)
       .lean();

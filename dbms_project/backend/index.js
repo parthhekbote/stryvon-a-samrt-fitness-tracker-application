@@ -35,9 +35,10 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, '.env') });
+import { TRUST_PROXY } from './config/env.js';
 
 const app = express();
+app.set('trust proxy', TRUST_PROXY);
 const PORT = process.env.PORT || 5001;
 
 // Middlewares

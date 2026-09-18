@@ -172,9 +172,14 @@ const progressSchema = new mongoose.Schema({
   bmi: { type: Number, required: true },
   body_fat: { type: Number, default: 0.0 },
   calories_burned: { type: Number, default: 0 },
-  recorded_at: { type: String, required: true } // YYYY-MM-DD
+  recorded_at: { type: String, required: true }, // YYYY-MM-DD
+  source: {
+    type: String,
+    enum: ['manual', 'workout', 'profile', 'register'],
+    default: 'manual'
+  }
 });
-progressSchema.index({ user_id: 1, recorded_at: 1 }, { unique: true });
+progressSchema.index({ user_id: 1, recorded_at: 1, source: 1 });
 export const Progress = mongoose.model('Progress', progressSchema);
 
 // 12. AIChatHistory Schema

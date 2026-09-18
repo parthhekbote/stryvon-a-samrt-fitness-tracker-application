@@ -363,8 +363,9 @@ export async function logWater(req, res) {
   const userId = req.user.userId;
   const { amount_ml } = req.body;
 
-  if (!amount_ml) {
-    return res.status(400).json({ message: 'Water amount is required.' });
+  const addedAmount = Number(amount_ml);
+  if (!Number.isInteger(addedAmount) || addedAmount <= 0 || addedAmount > 6000) {
+    return res.status(400).json({ message: 'Water amount must be a positive integer up to 6000 ml.' });
   }
 
   try {
@@ -373,7 +374,7 @@ export async function logWater(req, res) {
     await WaterLog.create({
       water_id: waterId,
       user_id: userId,
-      amount_ml: parseInt(amount_ml),
+      amount_ml: addedAmount,
       logged_at: new Date()
     });
 
