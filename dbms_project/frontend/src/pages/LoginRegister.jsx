@@ -66,6 +66,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
               setWelcomeBanner(`Welcome to STRYVON, ${data.user?.name || 'Athlete'}! Your account has been created.`);
             }
             onLogin(data.token, data.user, data.isNewUser);
+            navigate('/', { replace: true });
           } else if (isSubscribed) {
             setError(data.message || 'Google sign-in backend verification failed.');
           }
@@ -85,7 +86,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
     return () => {
       isSubscribed = false;
     };
-  }, [apiUrl, onLogin]);
+  }, [apiUrl, onLogin, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -116,6 +117,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
       }
 
       onLogin(data.token, data.user);
+      navigate('/', { replace: true });
     } catch (err) {
       if (err.name === 'TypeError' && err.message?.includes('fetch')) {
         setError(`Network error: Unable to connect to authentication server at ${apiUrl}. Please ensure backend server is active.`);
@@ -141,6 +143,8 @@ export default function LoginRegister({ onLogin, apiUrl }) {
       });
 
       const data = await response.json().catch(() => ({ message: 'Invalid response from server.' }));
+      console.log('Google auth response from backend:', response.status, data);
+
       if (!response.ok) {
         throw new Error(data.message || 'Google sign-in backend verification failed.');
       }
@@ -149,6 +153,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         setWelcomeBanner(`Welcome to STRYVON, ${data.user?.name || 'Athlete'}! Your account has been created.`);
       }
       onLogin(data.token, data.user, data.isNewUser);
+      navigate('/', { replace: true });
     } catch (err) {
       console.error('Google Sign-In Error:', err);
       if (err.code === 'auth/popup-closed-by-user') {

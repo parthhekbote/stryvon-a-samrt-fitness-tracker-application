@@ -413,6 +413,16 @@ function parseJwtPayload(token) {
   }
 }
 
+async function waitForDbConnection(maxWaitMs = 5000) {
+  if (mongoose.connection.readyState === 1) return true;
+  const start = Date.now();
+  while (Date.now() - start < maxWaitMs) {
+    await new Promise(r => setTimeout(r, 250));
+    if (mongoose.connection.readyState === 1) return true;
+  }
+  return mongoose.connection.readyState === 1;
+}
+
 export async function googleLogin(req, res) {
   const { idToken } = req.body;
 
@@ -420,7 +430,8 @@ export async function googleLogin(req, res) {
     return res.status(400).json({ success: false, message: 'Firebase ID token is required.' });
   }
 
-  if (mongoose.connection.readyState !== 1) {
+  const isDbReady = await waitForDbConnection(5000);
+  if (!isDbReady) {
     return res.status(503).json({
       success: false,
       message: 'Database connection is initializing or currently unavailable. Please try again in a moment.'
