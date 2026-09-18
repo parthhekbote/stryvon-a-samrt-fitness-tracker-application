@@ -48,10 +48,11 @@ export default function LoginRegister({ onLogin, apiUrl }) {
 
   // Process Google Sign-In redirect result on page load if popup COOP was bypassed
   useEffect(() => {
+    let isSubscribed = true;
     async function checkRedirect() {
       try {
         const result = await getRedirectResult(auth);
-        if (result && result.user) {
+        if (result && result.user && isSubscribed) {
           setGoogleLoading(true);
           const idToken = await result.user.getIdToken();
           const response = await fetch(`${apiUrl}/auth/google`, {
@@ -59,23 +60,31 @@ export default function LoginRegister({ onLogin, apiUrl }) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ idToken })
           });
-          const data = await response.json();
-          if (response.ok) {
+          const data = await response.json().catch(() => ({ message: 'Invalid response from server.' }));
+          if (response.ok && isSubscribed) {
             if (data.isNewUser) {
               setWelcomeBanner(`Welcome to STRYVON, ${data.user?.name || 'Athlete'}! Your account has been created.`);
             }
             onLogin(data.token, data.user, data.isNewUser);
-          } else {
+          } else if (isSubscribed) {
             setError(data.message || 'Google sign-in backend verification failed.');
           }
         }
       } catch (err) {
         console.error('Redirect sign-in error:', err);
+        if (isSubscribed) {
+          setError('Google sign-in verification error: ' + (err.message || 'Failed to complete redirect'));
+        }
       } finally {
-        setGoogleLoading(false);
+        if (isSubscribed) {
+          setGoogleLoading(false);
+        }
       }
     }
     checkRedirect();
+    return () => {
+      isSubscribed = false;
+    };
   }, [apiUrl, onLogin]);
 
   const handleSubmit = async (e) => {
@@ -101,14 +110,18 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         body: JSON.stringify(payload)
       });
       
-      const data = await response.json();
+      const data = await response.json().catch(() => ({ message: 'Invalid response from server.' }));
       if (!response.ok) {
         throw new Error(data.message || 'Authentication failed');
       }
 
       onLogin(data.token, data.user);
     } catch (err) {
-      setError(err.message);
+      if (err.name === 'TypeError' && err.message?.includes('fetch')) {
+        setError(`Network error: Unable to connect to authentication server at ${apiUrl}. Please ensure backend server is active.`);
+      } else {
+        setError(err.message || 'Authentication failed.');
+      }
     } finally {
       setLoading(false);
     }
@@ -127,7 +140,7 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         body: JSON.stringify({ idToken })
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({ message: 'Invalid response from server.' }));
       if (!response.ok) {
         throw new Error(data.message || 'Google sign-in backend verification failed.');
       }
@@ -140,16 +153,16 @@ export default function LoginRegister({ onLogin, apiUrl }) {
       console.error('Google Sign-In Error:', err);
       if (err.code === 'auth/popup-closed-by-user') {
         setError('Google Sign-In popup was closed before completing authentication.');
-      } else if (err.code === 'auth/popup-blocked' || err.message?.includes('Cross-Origin-Opener-Policy')) {
+      } else if (err.code === 'auth/popup-blocked' || err.message?.includes('Cross-Origin-Opener-Policy') || err.code === 'auth/cancelled-popup-request') {
         console.warn('Popup blocked or COOP restricted. Falling back to signInWithRedirect...');
         try {
           await signInWithRedirect(auth, googleProvider);
           return;
         } catch (redirectErr) {
-          setError('Google Sign-In failed: ' + redirectErr.message);
+          setError('Google Sign-In redirect failed: ' + redirectErr.message);
         }
-      } else if (err.code === 'auth/network-request-failed') {
-        setError('Network error connecting to Google. Please check your internet connection.');
+      } else if (err.name === 'TypeError' && err.message?.includes('fetch')) {
+        setError(`Network error: Unable to connect to backend server at ${apiUrl}. Please verify backend status.`);
       } else {
         setError(err.message || 'Google Sign-In failed. Please try again.');
       }

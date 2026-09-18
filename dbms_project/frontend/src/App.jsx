@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import SplashScreen from './components/SplashScreen';
@@ -14,9 +14,13 @@ import Analytics from './pages/Analytics';
 import Profile from './pages/Profile';
 
 export default function App() {
-  const [token, setToken] = useState(localStorage.getItem('token') || '');
+  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
   const [user, setUser] = useState(null);
-  const [showSplash, setShowSplash] = useState(true);
+
+  // Only show splash screen once per browser session
+  const [showSplash, setShowSplash] = useState(() => {
+    return !sessionStorage.getItem('stryvon_splash_shown');
+  });
 
   // Enforce permanent dark mode (Figma design system)
   useEffect(() => {
@@ -35,27 +39,30 @@ export default function App() {
     }
   }, [token]);
 
-  const handleSplashFinish = () => {
+  const handleSplashFinish = useCallback(() => {
+    sessionStorage.setItem('stryvon_splash_shown', 'true');
     setShowSplash(false);
-  };
+  }, []);
 
-  const handleLogin = (newToken, userData) => {
-    localStorage.clear();
-    sessionStorage.clear();
+  const handleLogin = useCallback((newToken, userData) => {
     localStorage.setItem('token', newToken);
     localStorage.setItem('user', JSON.stringify(userData));
     setToken(newToken);
     setUser(userData);
-  };
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.clear();
-    sessionStorage.clear();
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
     setToken('');
     setUser(null);
-  };
+  }, []);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'https://stryvon-a-samrt-fitness-tracker.onrender.com/api';
+  // Determine API URL: use env variable if available, else auto-detect localhost vs production fallback
+  const API_URL = import.meta.env.VITE_API_URL || 
+    (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+      ? 'http://localhost:5001/api'
+      : 'https://stryvon-a-samrt-fitness-tracker.onrender.com/api');
 
   return (
     <>
@@ -103,3 +110,4 @@ export default function App() {
     </>
   );
 }
+
