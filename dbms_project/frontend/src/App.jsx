@@ -94,7 +94,7 @@ export default function App() {
             <Route path="diet" element={<Diet apiUrl={API_URL} token={token} user={user} />} />
             <Route path="coach" element={<AICoach apiUrl={API_URL} token={token} user={user} />} />
             <Route path="analytics" element={<Analytics apiUrl={API_URL} token={token} />} />
-            <Route path="profile" element={<Profile apiUrl={API_URL} token={token} onLogout={handleLogout} />} />
+            <Route path="profile" element={<Profile apiUrl={API_URL} token={token} onLogout={handleLogout} onUpdateUser={(updatedUser) => setUser(updatedUser)} />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" />} />

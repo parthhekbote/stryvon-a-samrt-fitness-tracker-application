@@ -12,7 +12,7 @@ import {
   Heart 
 } from 'lucide-react';
 
-export default function Profile({ apiUrl, token, onLogout }) {
+export default function Profile({ apiUrl, token, onLogout, onUpdateUser }) {
   const [profile, setProfile] = useState(null);
   const [dietPlans, setDietPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -37,14 +37,14 @@ export default function Profile({ apiUrl, token, onLogout }) {
       // Fetch Profile
       const profRes = await fetch(`${apiUrl}/auth/profile`, { headers });
       const profData = await profRes.json();
-      if (profRes.ok) {
+      if (profRes.ok && profData.profile) {
         setProfile(profData.profile);
-        setName(profData.profile.name);
+        setName(profData.profile.name || '');
         setAge(profData.profile.age || '');
-        setGender(profData.profile.gender);
+        setGender(profData.profile.gender || 'Male');
         setHeight(profData.profile.height || '');
         setWeight(profData.profile.weight || '');
-        setGoalType(profData.profile.goal_type);
+        setGoalType(profData.profile.goal_type || 'Maintain');
         setWaterGoal(profData.profile.water_goal_ml || 2000);
         setDietId(profData.profile.current_diet_id || '');
       }
@@ -52,10 +52,10 @@ export default function Profile({ apiUrl, token, onLogout }) {
       // Fetch Diet plans
       const dietRes = await fetch(`${apiUrl}/diet/plans`, { headers });
       const dietData = await dietRes.json();
-      if (dietRes.ok) setDietPlans(dietData.plans);
+      if (dietRes.ok && dietData.plans) setDietPlans(dietData.plans);
 
     } catch (err) {
-      console.error(err);
+      console.error('Failed to fetch profile/diets:', err);
     } finally {
       setLoading(false);
     }
@@ -69,6 +69,12 @@ export default function Profile({ apiUrl, token, onLogout }) {
     e.preventDefault();
     setSuccess(false);
     setError('');
+
+    let parsedDietId = null;
+    if (dietId !== '' && dietId !== null && dietId !== undefined) {
+      const p = parseInt(dietId);
+      parsedDietId = !isNaN(p) ? p : dietId;
+    }
 
     try {
       const response = await fetch(`${apiUrl}/auth/profile`, {
@@ -85,24 +91,33 @@ export default function Profile({ apiUrl, token, onLogout }) {
           weight: weight ? parseFloat(weight) : null,
           goal_type: goalType,
           water_goal_ml: parseInt(waterGoal) || 2000,
-          current_diet_id: dietId ? parseInt(dietId) : null
+          current_diet_id: parsedDietId
         })
       });
 
+      const resData = await response.json();
+
       if (response.ok) {
         setSuccess(true);
-        // Refresh local memory of user details in local storage
+        
+        // Update local storage and notify parent App/Layout state
         const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-          const userObj = JSON.parse(storedUser);
-          userObj.name = name;
-          userObj.goal_type = goalType;
-          localStorage.setItem('user', JSON.stringify(userObj));
+        let userObj = storedUser ? JSON.parse(storedUser) : {};
+        userObj.name = name;
+        userObj.goal_type = goalType;
+        if (resData.profile) {
+          userObj = { ...userObj, ...resData.profile };
+          setProfile(resData.profile);
         }
+        localStorage.setItem('user', JSON.stringify(userObj));
+        
+        if (typeof onUpdateUser === 'function') {
+          onUpdateUser(userObj);
+        }
+
         await fetchProfileAndDiets();
       } else {
-        const data = await response.json();
-        throw new Error(data.message || 'Failed to update profile settings.');
+        throw new Error(resData.message || 'Failed to update profile settings.');
       }
     } catch (err) {
       setError(err.message);

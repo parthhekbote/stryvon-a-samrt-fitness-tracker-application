@@ -319,9 +319,14 @@ export async function updateProfile(req, res) {
     const valWeight = weight ? parseFloat(weight) : null;
     const valGoal = goal_type || 'Maintain';
     const valWater = water_goal_ml ? parseInt(water_goal_ml) : 2000;
-    const valDietId = current_diet_id ? parseInt(current_diet_id) : null;
+    
+    let valDietId = null;
+    if (current_diet_id !== null && current_diet_id !== undefined && current_diet_id !== '') {
+      const parsed = parseInt(current_diet_id);
+      valDietId = !isNaN(parsed) ? parsed : current_diet_id;
+    }
 
-    await User.findOneAndUpdate(
+    const updatedUser = await User.findOneAndUpdate(
       { user_id: userId },
       {
         name: valName,
@@ -332,12 +337,14 @@ export async function updateProfile(req, res) {
         goal_type: valGoal,
         water_goal_ml: valWater,
         current_diet_id: valDietId
-      }
+      },
+      { new: true }
     );
 
     // Recalculate BMI and update/insert progress log
+    let bmi = null;
     if (valWeight && valHeight) {
-      const bmi = calculateBMI(valWeight, valHeight);
+      bmi = calculateBMI(valWeight, valHeight);
       const today = new Date().toISOString().split('T')[0];
       const progressId = await getNextSequenceValue('progress_id');
 
@@ -348,7 +355,22 @@ export async function updateProfile(req, res) {
       );
     }
 
-    res.status(200).json({ message: 'Profile updated successfully.' });
+    res.status(200).json({ 
+      message: 'Profile updated successfully.',
+      profile: {
+        user_id: updatedUser ? updatedUser.user_id : userId,
+        name: updatedUser ? updatedUser.name : valName,
+        email: updatedUser ? updatedUser.email : '',
+        age: updatedUser ? updatedUser.age : valAge,
+        gender: updatedUser ? updatedUser.gender : valGender,
+        height: updatedUser ? updatedUser.height : valHeight,
+        weight: updatedUser ? updatedUser.weight : valWeight,
+        goal_type: updatedUser ? updatedUser.goal_type : valGoal,
+        water_goal_ml: updatedUser ? updatedUser.water_goal_ml : valWater,
+        current_diet_id: updatedUser ? updatedUser.current_diet_id : valDietId,
+        bmi
+      }
+    });
   } catch (error) {
     console.error('Profile update error:', error);
     res.status(500).json({ message: 'Failed to update profile.' });
