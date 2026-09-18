@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import StryvonLogo from '../components/StryvonLogo';
 import StryvonMotionGraphic from '../components/StryvonMotionGraphic';
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 
 export default function LoginRegister({ onLogin, apiUrl }) {
+  const navigate = useNavigate();
   const prefersReducedMotion = usePrefersReducedMotion();
   const [isLogin, setIsLogin] = useState(true);
   const [error, setError] = useState('');
