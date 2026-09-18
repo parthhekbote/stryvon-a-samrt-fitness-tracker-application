@@ -1,10 +1,10 @@
 /**
  * STRYVON PWA Service Worker
  * Robust offline asset caching, network-first API strategy,
- * and graceful navigation fallback for SPAs.
+ * network-first JS/CSS bundle strategy, and graceful SPA navigation fallback.
  */
 
-const CACHE_NAME = 'stryvon-pwa-v2';
+const CACHE_NAME = 'stryvon-pwa-v3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -32,6 +32,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
+            console.log('🧹 Purging outdated SW cache:', cache);
             return caches.delete(cache);
           }
         })
@@ -43,7 +44,6 @@ self.addEventListener('activate', (event) => {
 
 // Service Worker Fetch Event — Robust Network / Cache strategy
 self.addEventListener('fetch', (event) => {
-  // Ignore non-GET requests or browser extension URLs
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) return;
 
   const url = new URL(event.request.url);
@@ -62,22 +62,27 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. Navigation Mode (HTML Page Routing): Network-first with SPA index.html fallback
-  if (event.request.mode === 'navigate') {
+  // 2. JS & CSS Bundles / Navigation: Network-first strategy to prevent stale JS bundle crashes
+  if (event.request.mode === 'navigate' || url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.includes('/assets/')) {
     event.respondWith(
-      fetch(event.request).catch(async () => {
-        const cachedIndex = await caches.match('/index.html') || await caches.match('/');
-        return cachedIndex || fetch(event.request);
+      fetch(event.request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const resClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, resClone));
+        }
+        return networkResponse;
+      }).catch(async () => {
+        const cached = await caches.match(event.request) || await caches.match('/index.html') || await caches.match('/');
+        return cached || new Response('', { status: 404 });
       })
     );
     return;
   }
 
-  // 3. Static Assets: Cache-first with background revalidation & fetch safety
+  // 3. Other Static Assets: Cache-first with background revalidation
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Background revalidation
         fetch(event.request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
