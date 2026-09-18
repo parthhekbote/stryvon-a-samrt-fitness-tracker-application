@@ -6,6 +6,7 @@
     "dev": "npx concurrently \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "dev:server": "npm run dev --prefix backend",
     "build": "npm run build --prefix frontend",
+    "start": "cd backend && node index.js",
     "start:server": "npm run start --prefix backend"
   }
 }
