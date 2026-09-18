@@ -397,6 +397,22 @@ export async function updateProfile(req, res) {
   }
 }
 
+function parseJwtPayload(token) {
+  try {
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedBase64 = base64.padEnd(base64.length + (4 - (base64.length % 4)) % 4, '=');
+    const jsonPayload = Buffer.from(paddedBase64, 'base64').toString('utf8');
+    return JSON.parse(jsonPayload);
+  } catch (err) {
+    console.error('Failed to parse JWT payload:', err.message);
+    return null;
+  }
+}
+
 export async function googleLogin(req, res) {
   const { idToken } = req.body;
 
@@ -413,20 +429,21 @@ export async function googleLogin(req, res) {
 
   try {
     initFirebaseAdmin();
-    let decodedToken;
+    let decodedToken = null;
 
     if (isFirebaseAdminInitialized()) {
       try {
         decodedToken = await getAuth().verifyIdToken(idToken);
       } catch (verifyErr) {
         console.warn('Firebase verifyIdToken failed, falling back to decoding token payload:', verifyErr.message);
-        const base64Payload = idToken.split('.')[1];
-        decodedToken = JSON.parse(Buffer.from(base64Payload, 'base64').toString('utf8'));
+        decodedToken = parseJwtPayload(idToken);
       }
     } else {
-      // Fallback decode token payload if Firebase Admin credentials are not initialized in env
-      const base64Payload = idToken.split('.')[1];
-      decodedToken = JSON.parse(Buffer.from(base64Payload, 'base64').toString('utf8'));
+      decodedToken = parseJwtPayload(idToken);
+    }
+
+    if (!decodedToken) {
+      return res.status(400).json({ success: false, message: 'Unable to decode or verify Google token payload.' });
     }
 
     const { email, name, uid, sub } = decodedToken;

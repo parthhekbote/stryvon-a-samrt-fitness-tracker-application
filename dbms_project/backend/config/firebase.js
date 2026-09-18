@@ -21,6 +21,10 @@ export function initFirebaseAdmin() {
         serviceAccount = JSON.parse(Buffer.from(serviceAccountVar, 'base64').toString('utf8'));
       }
 
+      if (serviceAccount && serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
+
       initializeApp({
         credential: cert(serviceAccount)
       });
