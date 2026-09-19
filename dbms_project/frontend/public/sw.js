@@ -1,10 +1,10 @@
 /**
- * STRYVON PWA Service Worker
- * Robust offline asset caching, network-first API strategy,
+ * STRYVON PWA Service Worker (v4)
+ * Enforces immediate cache purging of old bundles,
  * network-first JS/CSS bundle strategy, and graceful SPA navigation fallback.
  */
 
-const CACHE_NAME = 'stryvon-pwa-v3';
+const CACHE_NAME = 'stryvon-pwa-v4';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -15,7 +15,7 @@ const STATIC_ASSETS = [
   '/icons/icon-512.png'
 ];
 
-// Service Worker Install Event — Cache Core Assets
+// Service Worker Install Event — Cache Core Assets & Skip Waiting Immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -25,24 +25,23 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Service Worker Activate Event — Purge Old Caches
+// Service Worker Activate Event — Purge ALL Outdated Cache Buckets Immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            console.log('🧹 Purging outdated SW cache:', cache);
+            console.log('🧹 SW v4: Purging outdated cache:', cache);
             return caches.delete(cache);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Service Worker Fetch Event — Robust Network / Cache strategy
+// Service Worker Fetch Event — Network-First Strategy for JS & CSS
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) return;
 
@@ -62,7 +61,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 2. JS & CSS Bundles / Navigation: Network-first strategy to prevent stale JS bundle crashes
+  // 2. JS, CSS, and HTML Navigation: Strict Network-First to guarantee latest bundle execution
   if (event.request.mode === 'navigate' || url.pathname.endsWith('.js') || url.pathname.endsWith('.css') || url.pathname.includes('/assets/')) {
     event.respondWith(
       fetch(event.request).then((networkResponse) => {

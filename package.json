@@ -7,7 +7,7 @@
     "dev:frontend": "npm run dev --prefix dbms_project/frontend",
     "dev:backend": "npm run dev --prefix dbms_project/backend",
     "dev:server": "npm run dev --prefix dbms_project/backend",
-    "build": "npm run build --prefix dbms_project/frontend"
+    "build": "npm --prefix dbms_project/frontend install && npm --prefix dbms_project/frontend run build"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"

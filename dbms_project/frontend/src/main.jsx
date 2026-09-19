@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
 import './index.css'
 
-// Register Service Worker for STRYVON PWA with auto-update check
+// Register Service Worker for STRYVON PWA with auto-update check & controllerchange reload
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
@@ -14,6 +14,15 @@ if ('serviceWorker' in navigator) {
       .catch((err) => {
         console.warn('STRYVON Service Worker registration failed:', err);
       });
+  });
+
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      console.log('🔄 STRYVON SW updated. Refreshing page for latest bundle...');
+      window.location.reload();
+    }
   });
 }
 

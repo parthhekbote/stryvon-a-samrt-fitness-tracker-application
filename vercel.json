@@ -1,5 +1,6 @@
 {
-  "framework": "vite",
+  "buildCommand": "npm --prefix dbms_project/frontend install && npm --prefix dbms_project/frontend run build",
+  "outputDirectory": "dbms_project/frontend/dist",
   "headers": [
     {
       "source": "/sw.js",
@@ -17,6 +18,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://stryvon-a-samrt-fitness-tracker.onrender.com/api/$1"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
