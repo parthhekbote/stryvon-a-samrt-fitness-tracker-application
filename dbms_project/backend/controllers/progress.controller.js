@@ -30,32 +30,6 @@ export async function logProgress(req, res) {
       return res.status(404).json({ message: 'User profile not found.' });
     }
 
-    // 12-hour Cooldown Check for manual weight logs
-    const lastManualProgress = await Progress.findOne({
-      user_id: userId,
-      $or: [{ source: 'manual' }, { source: { $exists: false } }]
-    }).sort({ created_at: -1, _id: -1 });
-
-    const now = new Date();
-    let lastLoggedTime = null;
-
-    if (lastManualProgress && lastManualProgress._id) {
-      lastLoggedTime = lastManualProgress._id.getTimestamp();
-    } else if (user.last_weight_logged_at) {
-      lastLoggedTime = new Date(user.last_weight_logged_at);
-    }
-
-    if (lastLoggedTime) {
-      const diffMs = now.getTime() - lastLoggedTime.getTime();
-      const diffHours = diffMs / (1000 * 60 * 60);
-      if (diffHours < 12) {
-        const remainingHours = Math.ceil(12 - diffHours);
-        return res.status(400).json({
-          message: `Weight can only be logged once every 12 hours. Please wait ${remainingHours} more hour(s).`
-        });
-      }
-    }
-
     const height = user.height;
     let bmi = 0;
     if (height && height > 0) {
@@ -63,23 +37,45 @@ export async function logProgress(req, res) {
       bmi = parseFloat((parsedWeight / (heightM * heightM)).toFixed(2));
     }
 
-    const existingProgress = await Progress.findOne({ user_id: userId, recorded_at: logDate, source: 'manual' });
-    if (existingProgress) {
-      existingProgress.weight = parsedWeight;
-      existingProgress.bmi = bmi;
-      if (body_fat !== undefined) existingProgress.body_fat = parseFloat(body_fat);
-      await existingProgress.save();
-    } else {
-      const progressId = await getNextSequenceValue('progress_id');
-      await Progress.create({
-        progress_id: progressId,
-        user_id: userId,
-        weight: parsedWeight,
-        bmi,
-        body_fat: body_fat ? parseFloat(body_fat) : 0,
-        recorded_at: logDate,
-        source: 'manual'
-      });
+    const now = new Date();
+    const parsedBodyFat = (body_fat !== undefined && body_fat !== null && body_fat !== '') ? parseFloat(body_fat) : null;
+
+    const updatePayload = {
+      weight: parsedWeight,
+      bmi,
+      source: 'manual'
+    };
+    if (parsedBodyFat !== null && !isNaN(parsedBodyFat)) {
+      updatePayload.body_fat = parsedBodyFat;
+    }
+
+    const updateRes = await Progress.updateMany(
+      { user_id: userId, recorded_at: logDate },
+      { $set: updatePayload }
+    );
+
+    if (updateRes.matchedCount === 0) {
+      try {
+        const progressId = await getNextSequenceValue('progress_id');
+        await Progress.create({
+          progress_id: progressId,
+          user_id: userId,
+          weight: parsedWeight,
+          bmi,
+          body_fat: (parsedBodyFat !== null && !isNaN(parsedBodyFat)) ? parsedBodyFat : 0.0,
+          recorded_at: logDate,
+          source: 'manual'
+        });
+      } catch (createErr) {
+        if (createErr.code === 11000) {
+          await Progress.updateMany(
+            { user_id: userId, recorded_at: logDate },
+            { $set: updatePayload }
+          );
+        } else {
+          throw createErr;
+        }
+      }
     }
 
     user.weight = parsedWeight;
@@ -91,7 +87,7 @@ export async function logProgress(req, res) {
       await awardBadge(userId, 'First Progress Logged');
     }
 
-    res.status(200).json({ message: 'Progress logged successfully.', bmi });
+    res.status(200).json({ message: 'Progress logged successfully.', bmi, weight: parsedWeight });
   } catch (error) {
     console.error('Failed to log progress:', error);
     res.status(500).json({ message: 'Failed to record progress stats.' });
@@ -121,11 +117,11 @@ export async function getAnalytics(req, res) {
       user_id: userId,
       $or: [{ source: { $in: ['manual', 'profile', 'register'] } }, { source: { $exists: false } }]
     })
-      .sort({ recorded_at: -1 })
-      .limit(daysLimit)
+      .sort({ recorded_at: -1, _id: -1 })
+      .limit(daysLimit * 2)
       .lean();
 
-    // Deduplicate weight entries by date, prioritizing manual > profile > register
+    // Deduplicate weight entries by date, prioritizing manual > profile > register, then latest _id
     const priorityMap = { manual: 3, profile: 2, register: 1 };
     const dateDedupped = {};
 
@@ -134,8 +130,12 @@ export async function getAnalytics(req, res) {
       const currentSource = log.source || 'manual';
       const currentPriority = priorityMap[currentSource] || 1;
 
-      if (!dateDedupped[key] || currentPriority > dateDedupped[key].priority) {
+      if (!dateDedupped[key]) {
         dateDedupped[key] = { log, priority: currentPriority };
+      } else {
+        if (currentPriority >= dateDedupped[key].priority) {
+          dateDedupped[key] = { log, priority: currentPriority };
+        }
       }
     });
 
@@ -237,7 +237,12 @@ export async function getAnalytics(req, res) {
       .slice(-10)
       .map(week => ({ week, count: weeklyMap[week] }));
 
+    const user = await User.findOne({ user_id: userId }).lean();
+    const totalWorkouts = userWorkouts.length;
+
     res.status(200).json({
+      user,
+      totalWorkouts,
       weightLogs,
       calorieHistory,
       muscleGroups,
@@ -255,36 +260,147 @@ export async function getPdfReportData(req, res) {
   try {
     const user = await User.findOne({ user_id: userId }).lean();
     const workouts = await UserWorkout.find({ user_id: userId }).lean();
-    const meals = await MealLog.find({ user_id: userId }).lean();
     const weightHistory = await Progress.find({
       user_id: userId,
       $or: [{ source: { $in: ['manual', 'profile', 'register'] } }, { source: { $exists: false } }]
     })
-      .sort({ recorded_at: -1 })
-      .limit(10)
+      .sort({ recorded_at: 1 })
+      .limit(30)
       .lean();
 
     const totalWorkouts = workouts.length;
-    const totalDuration = workouts.reduce((sum, w) => sum + (w.actual_duration || 0), 0);
-    const totalBurned = workouts.reduce((sum, w) => sum + (w.actual_calories_burned || 0), 0);
-    const totalMeals = meals.length;
-    const avgCalories = totalMeals > 0 ? Math.round(meals.reduce((sum, m) => sum + (m.calories || 0), 0) / totalMeals) : 0;
+    const currentWeightVal = user?.weight || (weightHistory.length > 0 ? weightHistory[weightHistory.length - 1].weight : null);
+    let bmiVal = null;
+    if (user?.height && currentWeightVal) {
+      const hM = user.height / 100;
+      bmiVal = parseFloat((currentWeightVal / (hM * hM)).toFixed(1));
+    }
+
+    const targetMuscles = ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads', 'Hamstrings', 'Core', 'Calves'];
+    const muscleCounts = {};
+    targetMuscles.forEach(m => { muscleCounts[m] = 0; });
+
+    workouts.forEach(w => {
+      const tags = (w.muscle_groups || []).map(m => String(m).toLowerCase().trim());
+      targetMuscles.forEach(target => {
+        const lowerTarget = target.toLowerCase();
+        if (tags.some(t => t.includes(lowerTarget) || lowerTarget.includes(t))) {
+          muscleCounts[target] = (muscleCounts[target] || 0) + 1;
+        }
+      });
+    });
 
     res.status(200).json({
-      summary: {
-        user,
-        stats: {
-          totalWorkouts,
-          totalDuration,
-          totalBurned,
-          totalMeals,
-          avgCalories
-        },
-        weightHistory
-      }
+      user: {
+        name: user?.name || user?.username || 'Member',
+        email: user?.email,
+        goal_type: user?.goal_type || 'Maintain & Tone',
+        streak_count: user?.current_streak ?? user?.streak_count ?? 0,
+        height: user?.height || null,
+        weight: currentWeightVal
+      },
+      stats: {
+        totalWorkouts,
+        currentStreak: user?.current_streak ?? user?.streak_count ?? 0,
+        currentWeight: currentWeightVal ? `${currentWeightVal} kg` : 'N/A',
+        bmi: bmiVal ? `${bmiVal}` : 'N/A',
+        goalType: user?.goal_type || 'Maintain & Tone'
+      },
+      muscleTelemetry: muscleCounts,
+      weightHistory
     });
   } catch (error) {
-    console.error('Failed to generate report:', error);
-    res.status(500).json({ message: 'Failed to extract progress report.' });
+    console.error('Failed to generate report data:', error);
+    res.status(500).json({ message: 'Failed to extract progress report data.' });
+  }
+}
+
+export async function getMuscleTelemetry(req, res) {
+  const userId = req.user.userId;
+  let { startDate, endDate, muscles } = req.query;
+
+  try {
+    const now = new Date();
+    // Default endDate to today (YYYY-MM-DD)
+    const todayStr = (endDate && typeof endDate === 'string') ? endDate.trim() : now.toISOString().split('T')[0];
+
+    // Default startDate to 30 days ago if missing
+    let startStr = (startDate && typeof startDate === 'string') ? startDate.trim() : null;
+    if (!startStr) {
+      const d30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      startStr = d30.toISOString().split('T')[0];
+    }
+
+    // Validate date format YYYY-MM-DD
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(startStr) || !dateRegex.test(todayStr)) {
+      return res.status(400).json({ message: 'Invalid date format. Expected YYYY-MM-DD.' });
+    }
+
+    const startObj = new Date(`${startStr}T00:00:00.000Z`);
+    const endObj = new Date(`${todayStr}T23:59:59.999Z`);
+
+    if (isNaN(startObj.getTime()) || isNaN(endObj.getTime())) {
+      return res.status(400).json({ message: 'Invalid start or end date.' });
+    }
+
+    if (startObj > endObj) {
+      return res.status(400).json({ message: 'Start date cannot be after end date.' });
+    }
+
+    // Guard against future start dates (allow up to current date)
+    const tomorrowObj = new Date();
+    tomorrowObj.setHours(23, 59, 59, 999);
+    if (startObj > tomorrowObj) {
+      return res.status(400).json({ message: 'Start date cannot be in the future.' });
+    }
+
+    // Parse list of target muscles
+    let targetMuscles = [];
+    if (muscles) {
+      if (Array.isArray(muscles)) {
+        targetMuscles = muscles.map(m => String(m).toLowerCase().trim()).filter(Boolean);
+      } else if (typeof muscles === 'string') {
+        targetMuscles = muscles.split(',').map(m => m.toLowerCase().trim()).filter(Boolean);
+      }
+    }
+
+    if (targetMuscles.length === 0) {
+      targetMuscles = [
+        'chest', 'back', 'shoulders', 'biceps', 'triceps', 'core', 'traps', 'forearms', 'lats',
+        'quads', 'hamstrings', 'glutes', 'calves', 'adductors'
+      ];
+    }
+
+    // Query completed workouts for user within date window
+    const userWorkouts = await UserWorkout.find({
+      user_id: userId,
+      logged_at: { $gte: startObj, $lte: endObj }
+    }).lean();
+
+    // Aggregation: count completed sessions tagged with each target muscle group
+    const counts = {};
+    targetMuscles.forEach(m => { counts[m] = 0; });
+
+    userWorkouts.forEach(workout => {
+      const sessionTags = (workout.muscle_groups || []).map(m => String(m).toLowerCase().trim());
+
+      targetMuscles.forEach(target => {
+        const isMatch = sessionTags.some(tag => tag === target || tag.includes(target) || target.includes(tag));
+        if (isMatch) {
+          counts[target] = (counts[target] || 0) + 1;
+        }
+      });
+    });
+
+    res.status(200).json({
+      startDate: startStr,
+      endDate: todayStr,
+      totalSessions: userWorkouts.length,
+      telemetry: counts
+    });
+  } catch (error) {
+    console.error('Failed to aggregate muscle telemetry:', error);
+    res.status(500).json({ message: 'Failed to aggregate muscle telemetry data.' });
   }
 }

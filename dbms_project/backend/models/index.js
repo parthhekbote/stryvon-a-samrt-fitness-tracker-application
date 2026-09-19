@@ -35,8 +35,11 @@ const userSchema = new mongoose.Schema({
   last_workout_date: { type: String, default: null },
   streak_milestones: { type: [Number], default: [] },
   last_active_date: { type: String, default: null },
+  active_program_id: { type: Number, default: null },
+  current_split_cursor: { type: Number, default: 1 },
+  streak_warning_enabled: { type: Boolean, default: true },
   water_goal_ml: { type: Number, default: 2000 },
-  current_diet_id: { type: Number, default: null },
+  notification_permission: { type: String, default: 'unset' }, // 'unset' | 'granted' | 'denied'
   created_at: { type: Date, default: Date.now }
 });
 export const User = mongoose.model('User', userSchema);
@@ -109,10 +112,10 @@ export const UserWorkout = mongoose.model('UserWorkout', userWorkoutSchema);
 // 7b. Program Schema
 const programSchema = new mongoose.Schema({
   program_id: { type: Number, unique: true, index: true },
-  user_id: { type: Number, required: true, index: true },
+  user_id: { type: Number, default: null, index: true },
   program_name: { type: String, required: true },
   schedule_mode: { type: String, enum: ['fixed', 'rotating'], default: 'rotating' },
-  is_active: { type: Boolean, default: false },
+  is_active: { type: Boolean, default: true },
   created_at: { type: Date, default: Date.now }
 });
 export const Program = mongoose.model('Program', programSchema);

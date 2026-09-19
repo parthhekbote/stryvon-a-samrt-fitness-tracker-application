@@ -6,7 +6,6 @@ import {
   TrendingUp, 
   Utensils, 
   Droplet, 
-  Award, 
   Heart, 
   Scale, 
   Plus, 
@@ -49,7 +48,7 @@ export default function Dashboard({ apiUrl, token, user }) {
       // Fetch Today's Water
       const waterRes = await fetch(`${apiUrl}/diet/water`, { headers });
       const waterData = await waterRes.json();
-      if (waterRes.ok) setWaterLogged(waterData.water_logged_ml || Number(waterData.total_water_ml) || 0);
+      if (waterRes.ok) setWaterLogged(Math.min(Number(waterData.water_logged_ml) || Number(waterData.total_water_ml) || 0, 6000));
 
       // Fetch Analytics (for weight logs chart)
       const anaRes = await fetch(`${apiUrl}/progress/analytics`, { headers });
@@ -95,18 +94,19 @@ export default function Dashboard({ apiUrl, token, user }) {
 
   const handleLogWater = async (amountMl) => {
     try {
+      if (waterLogged >= 6000) return;
       const headers = { 
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       };
-      const newWater = waterLogged + amountMl;
       const res = await fetch(`${apiUrl}/diet/water`, {
         method: 'POST',
         headers,
         body: JSON.stringify({ amount_ml: amountMl })
       });
+      const data = await res.json();
       if (res.ok) {
-        setWaterLogged(newWater);
+        setWaterLogged(Math.min(Number(data.water_logged_ml) || Number(data.total_water_ml) || (waterLogged + amountMl), 6000));
       }
     } catch (err) {
       console.error('Failed to log water:', err);
@@ -193,6 +193,17 @@ export default function Dashboard({ apiUrl, token, user }) {
     );
   }
 
+  const calculateDaysInactive = () => {
+    if (!profile?.last_workout_date) return 0;
+    const lastDate = new Date(profile.last_workout_date);
+    const today = new Date();
+    const diffTime = Math.abs(today - lastDate);
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  const daysInactive = calculateDaysInactive();
+  const showStreakWarning = (profile?.streak_warning_enabled ?? true) && (profile?.streak_count || 0) > 0 && daysInactive >= 5 && daysInactive <= 6;
+
   return (
     <motion.div 
       variants={containerVariants}
@@ -225,8 +236,32 @@ export default function Dashboard({ apiUrl, token, user }) {
         )}
       </motion.div>
 
-      {/* Grid: 4 Core Stat Cards */}
-      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      {/* Streak Warning Banner */}
+      {showStreakWarning && (
+        <motion.div 
+          variants={itemVariants} 
+          className="bg-orange-500/10 border-2 border-orange-500/50 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-orange-400 shadow-lg"
+        >
+          <div className="flex items-center gap-3">
+            <Flame className="text-orange-500 fill-orange-500 shrink-0" size={28} />
+            <div>
+              <h4 className="font-display font-extrabold text-sm uppercase tracking-wider text-white">WORKOUT STREAK AT RISK!</h4>
+              <p className="text-xs text-orange-300/90 mt-0.5 font-medium">
+                You haven't logged a workout in {daysInactive} days ({6 - daysInactive} grace day remaining). Log a session today to keep your {profile.streak_count}-day streak intact before it resets on Day 7!
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => navigate('/workouts')}
+            className="px-4 py-2 bg-orange-500 text-black font-display font-black text-xs uppercase tracking-wider rounded-xl hover:bg-orange-400 transition-all shrink-0 min-h-[44px] shadow-md"
+          >
+            LOG WORKOUT NOW
+          </button>
+        </motion.div>
+      )}
+
+      {/* Top Grid: Current Weight & Water Consumed Stat Cards */}
+      <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         {/* Weight Card */}
         <motion.div 
           whileTap={{ scale: 0.98 }}
@@ -251,58 +286,6 @@ export default function Dashboard({ apiUrl, token, user }) {
           </p>
         </motion.div>
 
-        {/* Calories Consumed Card */}
-        <motion.div 
-          whileTap={{ scale: 0.98 }}
-          className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg relative overflow-hidden group cursor-pointer"
-          onClick={() => navigate('/diet')}
-        >
-          <div className="absolute top-0 right-0 w-24 h-24 bg-[#D4FF00]/5 rounded-full blur-2xl group-hover:bg-[#D4FF00]/15 transition-all duration-500" />
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-[11px] font-extrabold text-[#474747] uppercase tracking-widest font-display">CALORIES CONSUMED</span>
-            <div className="p-2 bg-[#D4FF00]/10 text-[#D4FF00] rounded-2xl group-hover:scale-110 transition-transform">
-              <Utensils size={18} />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-3xl sm:text-4xl font-black text-white">
-              <CountUp value={mealTotals?.total_calories || 0} />
-            </span>
-            <span className="text-xs font-bold text-[#474747]">/ {calorieGoal} kcal</span>
-          </div>
-          <div className="w-full bg-[#0A0A0A] h-2 rounded-full mt-3 overflow-hidden border border-[#474747]/30">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: `${calPercent}%` }}
-              transition={{ duration: 0.6, ease: 'easeOut' }}
-              className="bg-[#D4FF00] h-full rounded-full shadow-[0_0_10px_#D4FF00]"
-            />
-          </div>
-        </motion.div>
-
-        {/* Protein Intake Card */}
-        <motion.div 
-          whileTap={{ scale: 0.98 }}
-          className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg relative overflow-hidden group cursor-pointer"
-          onClick={() => navigate('/diet')}
-        >
-          <div className="flex justify-between items-center mb-3">
-            <span className="text-[11px] font-extrabold text-[#474747] uppercase tracking-widest font-display">PROTEIN INTAKE</span>
-            <div className="p-2 bg-violet-500/10 text-violet-400 rounded-2xl group-hover:scale-110 transition-transform">
-              <Zap size={18} />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-3xl sm:text-4xl font-black text-white">
-              <CountUp value={mealTotals?.total_protein || 0} />
-            </span>
-            <span className="text-xs font-bold text-[#474747]">g consumed</span>
-          </div>
-          <p className="text-xs text-[#E5E5E5]/60 mt-2 font-semibold">
-            Carbs: <span className="text-[#E5E5E5]"><CountUp value={mealTotals?.total_carbs || 0} />g</span> | Fats: <span className="text-[#E5E5E5]"><CountUp value={mealTotals?.total_fats || 0} />g</span>
-          </p>
-        </motion.div>
-
         {/* Water Tracker Card */}
         <motion.div 
           whileTap={{ scale: 0.98 }}
@@ -311,8 +294,24 @@ export default function Dashboard({ apiUrl, token, user }) {
         >
           <div className="flex justify-between items-center mb-3">
             <span className="text-[11px] font-extrabold text-[#474747] uppercase tracking-widest font-display">WATER CONSUMED</span>
-            <div className="p-2 bg-sky-500/10 text-sky-400 rounded-2xl group-hover:scale-110 transition-transform">
-              <Droplet size={18} />
+            <div className="flex items-center gap-2">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.92 }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleLogWater(500);
+                }}
+                disabled={waterLogged >= 6000}
+                className="px-2.5 py-1 bg-sky-500 hover:bg-sky-400 disabled:bg-[#474747] disabled:opacity-50 text-black font-display font-extrabold text-[11px] rounded-xl flex items-center gap-1 cursor-pointer transition-all shadow-md shadow-sky-500/20"
+                title="Quick Add 500ml Water"
+              >
+                <Plus size={13} strokeWidth={3} />
+                <span>+500ml</span>
+              </motion.button>
+              <div className="p-2 bg-sky-500/10 text-sky-400 rounded-2xl group-hover:scale-110 transition-transform">
+                <Droplet size={18} />
+              </div>
             </div>
           </div>
           <div className="flex items-baseline gap-1.5">
@@ -334,9 +333,9 @@ export default function Dashboard({ apiUrl, token, user }) {
 
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Side (2 Cols): Weight Log Trend Graph & Hydration */}
+        {/* Left Side (2 Cols): Weight Telemetry Graph, Nutrition Cards & BMI */}
         <motion.div variants={itemVariants} className="lg:col-span-2 space-y-6">
-          {/* Weight Log Trend Graph */}
+          {/* 1. Weight Log Trend Graph */}
           <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg relative overflow-hidden">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4 sm:mb-6">
               <div>
@@ -401,54 +400,81 @@ export default function Dashboard({ apiUrl, token, user }) {
             </div>
           </div>
 
-          {/* Quick Track Row: Water and BMI */}
+          {/* 2. Calories Consumed & Protein Intake Cards (Placed After Weight Progress Telemetry) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-            {/* Water Logger */}
-            <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg">
-              <h3 className="font-display text-xl font-bold text-white tracking-wide">WATER HYDRATION</h3>
-              <p className="text-xs text-[#474747] mb-4 font-semibold uppercase tracking-wider">Quick-add water to hit your daily goal of {waterGoal} ml.</p>
-              
-              <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-3">
-                <motion.button 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => handleLogWater(250)}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-[#0A0A0A] hover:bg-[#262626] text-[#E5E5E5] border border-[#474747]/50 py-3 rounded-2xl font-bold transition-all text-xs font-display tracking-wider cursor-pointer min-h-[44px]"
-                >
-                  <Plus size={14} /> +250 ML (CUP)
-                </motion.button>
-                <motion.button 
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.96 }}
-                  onClick={() => handleLogWater(500)}
-                  className="flex-1 flex items-center justify-center gap-1.5 bg-sky-500 text-black hover:bg-sky-400 py-3 rounded-2xl font-extrabold transition-all text-xs font-display tracking-wider shadow-lg shadow-sky-500/20 cursor-pointer min-h-[44px]"
-                >
-                  <Plus size={14} /> +500 ML (BOTTLE)
-                </motion.button>
+            {/* Calories Consumed Card */}
+            <motion.div 
+              whileTap={{ scale: 0.98 }}
+              className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg relative overflow-hidden group cursor-pointer"
+              onClick={() => navigate('/diet')}
+            >
+              <div className="absolute top-0 right-0 w-24 h-24 bg-[#D4FF00]/5 rounded-full blur-2xl group-hover:bg-[#D4FF00]/15 transition-all duration-500" />
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-[11px] font-extrabold text-[#474747] uppercase tracking-widest font-display">CALORIES CONSUMED</span>
+                <div className="p-2 bg-[#D4FF00]/10 text-[#D4FF00] rounded-2xl group-hover:scale-110 transition-transform">
+                  <Utensils size={18} />
+                </div>
               </div>
-            </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display text-3xl sm:text-4xl font-black text-white">
+                  <CountUp value={mealTotals?.total_calories || 0} />
+                </span>
+                <span className="text-xs font-bold text-[#474747]">/ {calorieGoal} kcal</span>
+              </div>
+              <div className="w-full bg-[#0A0A0A] h-2 rounded-full mt-3 overflow-hidden border border-[#474747]/30">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${calPercent}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                  className="bg-[#D4FF00] h-full rounded-full shadow-[0_0_10px_#D4FF00]"
+                />
+              </div>
+            </motion.div>
 
-            {/* BMI Index Indicator */}
-            <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg flex flex-col justify-between space-y-4">
-              <div>
-                <h3 className="font-display text-xl font-bold text-white tracking-wide">ACTIVE BMI INDEX</h3>
-                <p className="text-xs text-[#474747] mt-0.5 font-semibold uppercase tracking-wider">Derived from profile height and weight.</p>
+            {/* Protein Intake Card */}
+            <motion.div 
+              whileTap={{ scale: 0.98 }}
+              className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg relative overflow-hidden group cursor-pointer"
+              onClick={() => navigate('/diet')}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-[11px] font-extrabold text-[#474747] uppercase tracking-widest font-display">PROTEIN INTAKE</span>
+                <div className="p-2 bg-violet-500/10 text-violet-400 rounded-2xl group-hover:scale-110 transition-transform">
+                  <Zap size={18} />
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <span className="font-display text-3xl sm:text-4xl font-extrabold text-white">{bmi ? bmi : '--'}</span>
-                  <span className="text-[11px] text-[#474747] block mt-0.5 font-bold uppercase tracking-widest font-display">BMI Score</span>
-                </div>
-                <div className="text-right">
-                  <span className={`text-xs sm:text-sm font-black font-display tracking-wider ${bmiColor}`}>{bmiCategory}</span>
-                  <span className="text-[10px] sm:text-[11px] text-[#474747] block mt-0.5 font-semibold">18.5 - 24.9 Standard</span>
-                </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display text-3xl sm:text-4xl font-black text-white">
+                  <CountUp value={mealTotals?.total_protein || 0} />
+                </span>
+                <span className="text-xs font-bold text-[#474747]">g consumed</span>
+              </div>
+              <p className="text-xs text-[#E5E5E5]/60 mt-2 font-semibold">
+                Carbs: <span className="text-[#E5E5E5]"><CountUp value={mealTotals?.total_carbs || 0} />g</span> | Fats: <span className="text-[#E5E5E5]"><CountUp value={mealTotals?.total_fats || 0} />g</span>
+              </p>
+            </motion.div>
+          </div>
+
+          {/* 3. Active BMI Index */}
+          <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg flex flex-col justify-between space-y-4">
+            <div>
+              <h3 className="font-display text-xl font-bold text-white tracking-wide">ACTIVE BMI INDEX</h3>
+              <p className="text-xs text-[#474747] mt-0.5 font-semibold uppercase tracking-wider">Derived from profile height and weight.</p>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="font-display text-3xl sm:text-4xl font-extrabold text-white">{bmi ? bmi : '--'}</span>
+                <span className="text-[11px] text-[#474747] block mt-0.5 font-bold uppercase tracking-widest font-display">BMI Score</span>
+              </div>
+              <div className="text-right">
+                <span className={`text-xs sm:text-sm font-black font-display tracking-wider ${bmiColor}`}>{bmiCategory}</span>
+                <span className="text-[10px] sm:text-[11px] text-[#474747] block mt-0.5 font-semibold">18.5 - 24.9 Standard</span>
               </div>
             </div>
           </div>
         </motion.div>
 
-        {/* Right Side (1 Col): AI Coach Insights & Unlocked Badges */}
+        {/* Right Side (1 Col): AI Coach Insights */}
         <motion.div variants={itemVariants} className="space-y-6">
           {/* AI Coach Insights Card */}
           <motion.div 
@@ -490,41 +516,6 @@ export default function Dashboard({ apiUrl, token, user }) {
               <span>CHAT WITH AI COACH →</span>
             </motion.button>
           </motion.div>
-
-          {/* Achieved Badges */}
-          <div className="bg-[#1E1E1E] border border-[#474747]/40 p-4 sm:p-6 rounded-3xl shadow-lg">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-display text-lg sm:text-xl font-bold text-white flex items-center gap-2 tracking-wide">
-                <Award size={18} className="text-[#D4FF00]" />
-                UNLOCKED BADGES
-              </h3>
-              <span className="text-xs text-[#D4FF00] font-black font-display tracking-wider">
-                {profile?.badges?.length || 0} UNLOCKED
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-3">
-              {profile?.badges && profile.badges.length > 0 ? (
-                profile.badges.map((bName, idx) => (
-                  <motion.div 
-                    key={idx} 
-                    whileHover={{ scale: 1.04 }}
-                    className="flex flex-col items-center text-center p-3 rounded-2xl bg-[#0A0A0A] border border-[#474747]/30"
-                  >
-                    <div className="h-9 w-9 bg-[#D4FF00]/20 text-[#D4FF00] rounded-full flex items-center justify-center mb-1.5">
-                      <Award size={16} />
-                    </div>
-                    <span className="text-[11px] font-bold text-[#E5E5E5] font-display tracking-wider uppercase line-clamp-1">{bName}</span>
-                    <span className="text-[9px] text-[#474747] mt-0.5 font-semibold">Unlocked Badge</span>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="col-span-2 text-center py-4 text-xs text-[#474747]">
-                  No badges unlocked yet. Complete workouts & meals to earn badges!
-                </div>
-              )}
-            </div>
-          </div>
         </motion.div>
       </div>
     </motion.div>

@@ -28,9 +28,13 @@ async function callAIModel(systemPrompt, userPrompt) {
   if (groqKey.startsWith('gsk_')) {
     const groq = new Groq({ apiKey: groqKey });
     const models = [
+      'groq/compound',
+      'groq/compound-mini',
+      'qwen/qwen3.8-27b',
+      'openai/gpt-oss-120b',
+      'openai/gpt-oss-20b',
       'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant',
-      'mixtral-8x7b-32768'
+      'llama-3.1-8b-instant'
     ];
 
     for (const modelName of models) {
@@ -58,7 +62,7 @@ async function callAIModel(systemPrompt, userPrompt) {
 
   // 2. Google Gemini REST API Path
   if (geminiKey) {
-    const geminiModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+    const geminiModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.5-pro'];
     for (const modelName of geminiModels) {
       try {
         console.log(`Attempting Google Gemini REST API completion (${modelName})...`);
@@ -108,7 +112,7 @@ export async function chatWithCoach(req, res) {
   try {
     const user = await User.findOne({ user_id: userId });
 
-    let diet = { calories: 'N/A', protein: 'N/A', carbs: 'N/A', fats: 'N/A' };
+    let diet = { calories: null, protein: null, carbs: null, fats: null };
     if (user && user.current_diet_id) {
       const dietPlan = await DietPlan.findOne({ diet_id: user.current_diet_id });
       if (dietPlan) diet = dietPlan;
@@ -136,6 +140,9 @@ export async function chatWithCoach(req, res) {
       fats: todayMeals.reduce((sum, m) => sum + (m.fats || 0), 0)
     };
 
+    const proteinTarget = (diet && diet.protein && diet.protein !== 'N/A') ? `${diet.protein}g` : '150g';
+    const caloriesTarget = (diet && diet.calories && diet.calories !== 'N/A') ? `${diet.calories} kcal` : '2,200 kcal';
+
     const systemPrompt = `You are STRYVON AI, an elite personal trainer and dietician. Your goal is to suggest customized workouts, advise on diets, analyze progress, motivate users, and give expert nutrition/recovery guidelines.
     
 Here is the real-time profile of the client:
@@ -143,7 +150,7 @@ Here is the real-time profile of the client:
 - Goal: ${user ? user.goal_type : 'Balanced Fitness'}
 - Stats: Height: ${user?.height || 'N/A'}cm, Weight: ${user?.weight || 'N/A'}kg, Age: ${user?.age || 'N/A'}, Gender: ${user?.gender || 'N/A'}
 - Active Streak: ${user ? user.streak_count : 0} days
-- Daily Target: ${diet.calories} kcal, Protein: ${diet.protein}g, Carbs: ${diet.carbs}g, Fat: ${diet.fats}g
+- Daily Target: ${caloriesTarget}, Protein: ${proteinTarget}
 - Today's Logged Macros: ${mealStats.calories} kcal, Protein: ${mealStats.protein}g, Carbs: ${mealStats.carbs}g, Fat: ${mealStats.fats}g
 - Workouts completed: ${workoutCount} (${totalBurned} total kcal burned)
 
@@ -155,6 +162,8 @@ Speak directly to the user. Be concise, extremely motivating, professional, and 
     if (!aiResponse) {
       console.warn('⚠️ USING FALLBACK TEMPLATE - AI call failed');
       const lowerPrompt = prompt.toLowerCase();
+      const isSensibleText = /^[a-zA-Z0-9\s?,.!-]{3,100}$/.test(prompt) && !/^(.)\1{4,}$/.test(prompt);
+
       if (lowerPrompt.includes('more workout') || lowerPrompt.includes('workout list') || lowerPrompt.includes('exercise list')) {
         aiResponse = `### Additional STRYVON Workout Options
 
@@ -172,6 +181,23 @@ Speak directly to the user. Be concise, extremely motivating, professional, and 
 4. **Weighted Dips / Push-Ups**: 3 sets to Failure (Finisher)
 
 **Coach Tip**: Focus on controlling the 3-second eccentric phase for maximum hypertrophy!`;
+      } else if (lowerPrompt.includes('leg') || lowerPrompt.includes('squat')) {
+        aiResponse = `### STRYVON Leg Day Routine
+
+1. **Barbell Back Squat**: 4 sets x 8-10 reps (Quads & Glutes Focus)
+2. **Romanian Deadlift**: 4 sets x 10 reps (Hamstrings & Lower Back)
+3. **Leg Press Machine**: 3 sets x 12 reps (Hypertrophy Volume)
+4. **Standing Calf Raises**: 4 sets x 15 reps (Calves Finisher)
+
+**Coach Tip**: Ensure full depth on squats while keeping your spine neutral for optimal leg activation!`;
+      } else if (lowerPrompt.includes('protein') || lowerPrompt.includes('nutrition') || lowerPrompt.includes('diet') || lowerPrompt.includes('calorie')) {
+        aiResponse = `### STRYVON Nutrition & Macro Guidance
+
+- **Protein Target**: Target **${proteinTarget} Protein** daily for optimal muscle recovery and tissue repair.
+- **Calorie Intake**: Maintain a daily energy target of **${caloriesTarget}** based on your active goals.
+- **Hydration**: Drink at least 2.5 - 3.0 Liters of water daily to support performance.
+
+**Coach Tip**: Consume 25-35g of protein within 1 hour post-workout for maximum protein synthesis.`;
       } else if (lowerPrompt.includes('split') || lowerPrompt.includes('4 day') || lowerPrompt.includes('4-day')) {
         aiResponse = `### STRYVON 4-Day Muscle Building Split
 
@@ -182,22 +208,14 @@ Speak directly to the user. Be concise, extremely motivating, professional, and 
 - **Day 5: Pull & Arms Hypertrophy** (Lat Pulldowns, Seated Cable Rows, Bicep Curls)
 
 **Coach Tip**: Keep rest periods to 90 seconds between compound sets to optimize muscle growth!`;
-      } else if (lowerPrompt.includes('what') || lowerPrompt.includes('help') || lowerPrompt.includes('how')) {
-        aiResponse = `### STRYVON Coach Response
-
-I noticed you asked: **"${prompt}"**
-
-Here is how I can assist you right now:
-- **Custom Workout Creation**: Ask for a specific split (e.g. 4-day split, leg day, shoulder workout).
-- **Nutrition & Macros**: Ask for customized calorie targets, meal recommendations, or macro ratios.
-- **Progress Tracking**: Ask to review your weight trend or weekly summary stats.
-
-How would you like to structure today's session?`;
       } else {
-        aiResponse = `### STRYVON Coach Response for "${prompt}"
+        const promptHeader = isSensibleText ? `for "${prompt.trim()}"` : '';
+        aiResponse = `> **Notice**: AI model service is currently in offline fallback mode.
 
-1. **Custom Plan**: Based on your **${user?.goal_type || 'Muscle Gain'}** goal, structure your workout with 3-4 compound movements followed by targeted isolation exercises.
-2. **Nutrition Focus**: Target **${diet.protein || 150}g Protein** daily and consume sufficient calories (${diet.calories || 2200} kcal).
+### STRYVON Coach Guidance ${promptHeader}
+
+1. **Custom Plan**: Based on your **${user?.goal_type || 'Balanced Fitness'}** goal, structure your workout with 3-4 compound movements followed by targeted isolation exercises.
+2. **Nutrition Focus**: Target **${proteinTarget} Protein** daily and consume sufficient calories (${caloriesTarget}).
 3. **Consistency**: Keep logging your workout sets and daily weight to get personalized AI progress metrics!`;
       }
     }
@@ -250,7 +268,7 @@ export async function getWeeklySummary(req, res) {
     const totalBurned = workouts.reduce((sum, w) => sum + (w.actual_calories_burned || 0), 0);
     const totalConsumed = meals.reduce((sum, m) => sum + (m.calories || 0), 0);
 
-    const summaryPrompt = `Analyze this user's fitness activity over the last 7 days and compile a concise weekly fitness summary.
+    const summaryPrompt = `Analyze this user's fitness activity over the last 7 days and compile a concise weekly summary.
     
 Client details:
 - Name: ${user?.name}
@@ -261,17 +279,15 @@ Client details:
 - Total meals logged: ${meals.length}
 - Avg daily calorie intake: ${meals.length > 0 ? Math.round(totalConsumed / 7) : 0} kcal
 
-Provide a short weekly progress summary in markdown with bullet points. Keep it under 200 words.`;
+CRITICAL CONSTRAINT: Your entire response MUST BE STRICTLY AT MOST 4 TO 5 LINES TOTAL (under 50 words). Do NOT create multi-section headings like "**Observations**", "**Next Steps**", or long bullet lists. Provide only a 4-line concise summary covering: Goal & Status, Workouts, Nutrition, and Coach Tip.`;
 
     let summaryText = await callAIModel(summaryPrompt, 'Generate weekly summary');
 
     if (!summaryText) {
-      summaryText = `### STRYVON Weekly Summary
-      
-- **Consistency**: You have completed **${workouts.length} workouts** this week! Keep pushing.
-- **Nutrition**: You logged **${meals.length} meals**. Building logging habits is key to tracking macros!
-- **Feedback**: Since your goal is **${user?.goal_type || 'Maintain'}**, align daily calories with target macros.
-- **Action Item**: Select a preset workout template and schedule your next session today!`;
+      summaryText = `**Weekly Fitness Summary (${user?.name || 'Athlete'})**
+• **Goal & Activity**: ${user?.goal_type || 'Maintain'} goal — ${workouts.length} workout(s) completed (${totalBurned} kcal burned).
+• **Nutrition Tracking**: Logged ${meals.length} meal(s) averaging ${meals.length > 0 ? Math.round(totalConsumed / 7) : 0} kcal/day.
+• **Coach Recommendation**: Keep logging workouts and meals daily to establish baseline trends.`;
     }
 
     res.status(200).json({ summary: summaryText, insight: summaryText });

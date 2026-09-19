@@ -236,6 +236,7 @@ export default function Diet({ apiUrl, token, user }) {
 
   const handleLogWater = async (amount) => {
     try {
+      if (waterLogged >= 6000) return;
       const numericAmount = Number(amount);
       const response = await fetch(`${apiUrl}/diet/water`, {
         method: 'POST',
@@ -245,8 +246,9 @@ export default function Diet({ apiUrl, token, user }) {
         },
         body: JSON.stringify({ amount_ml: numericAmount })
       });
+      const data = await response.json();
       if (response.ok) {
-        setWaterLogged(prev => Number(prev) + numericAmount);
+        setWaterLogged(Math.min(Number(data.water_logged_ml) || Number(data.total_water_ml) || (Number(waterLogged) + numericAmount), 6000));
       }
     } catch (err) {
       console.error(err);

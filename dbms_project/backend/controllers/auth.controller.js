@@ -57,7 +57,8 @@ export async function updateStreak(userId, clientDate = null) {
       const diffTime = Math.abs(currentDate - lastDate);
       const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
 
-      if (diffDays === 1) {
+      // 6-Day Grace Rule: Increment streak if within 6 days window, reset to 1 if 7+ days missed
+      if (diffDays <= 6) {
         current += 1;
       } else {
         current = 1;
@@ -160,15 +161,34 @@ export async function register(req, res) {
 
     if (valWeight && valHeight) {
       const bmi = calculateBMI(valWeight, valHeight);
-      const progressId = await getNextSequenceValue('progress_id');
-      await Progress.findOneAndUpdate(
-        { user_id: userId, recorded_at: today, source: 'register' },
-        { 
-          $set: { weight: valWeight, bmi, body_fat: 0.0 },
-          $setOnInsert: { progress_id: progressId, source: 'register' }
-        },
-        { upsert: true, new: true }
-      );
+      const existingProgress = await Progress.findOne({ user_id: userId, recorded_at: today });
+      if (existingProgress) {
+        existingProgress.weight = valWeight;
+        existingProgress.bmi = bmi;
+        await existingProgress.save();
+      } else {
+        try {
+          const progressId = await getNextSequenceValue('progress_id');
+          await Progress.create({
+            progress_id: progressId,
+            user_id: userId,
+            weight: valWeight,
+            bmi,
+            body_fat: 0.0,
+            recorded_at: today,
+            source: 'register'
+          });
+        } catch (pErr) {
+          if (pErr.code === 11000) {
+            await Progress.updateOne(
+              { user_id: userId, recorded_at: today },
+              { $set: { weight: valWeight, bmi } }
+            );
+          } else {
+            throw pErr;
+          }
+        }
+      }
     }
 
     const token = jwt.sign({ userId, email: newUser.email }, JWT_SECRET, { algorithm: 'HS256', expiresIn: '7d' });
@@ -249,19 +269,32 @@ export async function getProfile(req, res) {
     let activeStreak = user.current_streak || user.streak_count || 0;
 
     if (lastWorkoutStr && activeStreak > 0) {
-      const lastDateClean = typeof lastWorkoutStr === 'string' ? lastWorkoutStr.split('T')[0] : new Date(lastWorkoutStr).toISOString().split('T')[0];
-      if (lastDateClean !== today) {
-        const lastDate = new Date(lastDateClean);
-        const currentDate = new Date(today);
-        const diffTime = Math.abs(currentDate - lastDate);
-        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays > 1) {
-          activeStreak = 0;
-          user.current_streak = 0;
-          user.streak_count = 0;
-          await user.save();
+      try {
+        let lastDateClean = null;
+        if (typeof lastWorkoutStr === 'string' && /^\d{4}-\d{2}-\d{2}/.test(lastWorkoutStr)) {
+          lastDateClean = lastWorkoutStr.split('T')[0];
+        } else {
+          const d = new Date(lastWorkoutStr);
+          if (!isNaN(d.getTime())) {
+            lastDateClean = d.toISOString().split('T')[0];
+          }
         }
+
+        if (lastDateClean && lastDateClean !== today) {
+          const lastDate = new Date(lastDateClean);
+          const currentDate = new Date(today);
+          const diffTime = Math.abs(currentDate - lastDate);
+          const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+
+          if (diffDays > 6) {
+            activeStreak = 0;
+            user.current_streak = 0;
+            user.streak_count = 0;
+            await user.save();
+          }
+        }
+      } catch (e) {
+        console.warn('Error parsing lastWorkoutStr in getProfile:', e.message);
       }
     }
 
@@ -289,8 +322,10 @@ export async function getProfile(req, res) {
         longest_streak: user.longest_streak || activeStreak,
         last_workout_date: user.last_workout_date || null,
         streak_milestones: user.streak_milestones || [],
-        water_goal_ml: user.water_goal_ml,
+        water_goal_ml: user.water_goal_ml || 2000,
         current_diet_id: user.current_diet_id,
+        streak_warning_enabled: user.streak_warning_enabled ?? true,
+        notification_permission: user.notification_permission || 'default',
         diet_name: dietName,
         bmi,
         badges: badges.map(b => b.badge_name)
@@ -304,13 +339,19 @@ export async function getProfile(req, res) {
 
 export async function updateProfile(req, res) {
   const userId = req.user.userId;
-  const { name, age, gender, height, weight, goal_type, water_goal_ml, current_diet_id } = req.body;
+  const { name, age, gender, height, weight, goal_type, water_goal_ml, current_diet_id, streak_warning_enabled, notification_permission } = req.body;
 
   try {
     const updateFields = {};
     if (name !== undefined && name !== null) updateFields.name = String(name).trim();
     if (gender !== undefined && gender !== null) updateFields.gender = gender;
     if (goal_type !== undefined && goal_type !== null) updateFields.goal_type = goal_type;
+    if (streak_warning_enabled !== undefined && streak_warning_enabled !== null) {
+      updateFields.streak_warning_enabled = Boolean(streak_warning_enabled);
+    }
+    if (notification_permission !== undefined && notification_permission !== null) {
+      updateFields.notification_permission = String(notification_permission);
+    }
 
     if (age !== undefined && age !== null && age !== '') {
       const parsedAge = parseInt(age);
@@ -363,16 +404,35 @@ export async function updateProfile(req, res) {
     if (updatedUser.weight && updatedUser.height) {
       bmi = calculateBMI(updatedUser.weight, updatedUser.height);
       const today = new Date().toISOString().split('T')[0];
-      const progressId = await getNextSequenceValue('progress_id');
 
-      await Progress.findOneAndUpdate(
-        { user_id: userId, recorded_at: today, source: 'profile' },
-        { 
-          $set: { weight: updatedUser.weight, bmi },
-          $setOnInsert: { progress_id: progressId, source: 'profile' }
-        },
-        { upsert: true, new: true }
-      );
+      const existingProgress = await Progress.findOne({ user_id: userId, recorded_at: today });
+      if (existingProgress) {
+        existingProgress.weight = updatedUser.weight;
+        existingProgress.bmi = bmi;
+        await existingProgress.save();
+      } else {
+        try {
+          const progressId = await getNextSequenceValue('progress_id');
+          await Progress.create({
+            progress_id: progressId,
+            user_id: userId,
+            weight: updatedUser.weight,
+            bmi,
+            body_fat: 0.0,
+            recorded_at: today,
+            source: 'profile'
+          });
+        } catch (pErr) {
+          if (pErr.code === 11000) {
+            await Progress.updateOne(
+              { user_id: userId, recorded_at: today },
+              { $set: { weight: updatedUser.weight, bmi } }
+            );
+          } else {
+            throw pErr;
+          }
+        }
+      }
     }
 
     res.status(200).json({ 
@@ -388,6 +448,8 @@ export async function updateProfile(req, res) {
         goal_type: updatedUser.goal_type,
         water_goal_ml: updatedUser.water_goal_ml,
         current_diet_id: updatedUser.current_diet_id,
+        streak_warning_enabled: updatedUser.streak_warning_enabled,
+        notification_permission: updatedUser.notification_permission,
         bmi
       }
     });

@@ -369,17 +369,48 @@ export async function logWater(req, res) {
   }
 
   try {
-    const waterId = await getNextSequenceValue('water_id');
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
 
-    await WaterLog.create({
-      water_id: waterId,
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const todayWaterLogs = await WaterLog.find({
       user_id: userId,
-      amount_ml: addedAmount,
-      logged_at: new Date()
+      logged_at: { $gte: startOfDay, $lte: endOfDay }
     });
 
-    await updateStreak(userId);
-    res.status(201).json({ message: 'Water logged successfully.' });
+    const currentTotal = todayWaterLogs.reduce((sum, w) => sum + (w.amount_ml || 0), 0);
+    const MAX_LIMIT_ML = 6000;
+
+    if (currentTotal >= MAX_LIMIT_ML) {
+      return res.status(200).json({
+        message: 'Daily maximum water limit of 6000 ml reached.',
+        total_water_ml: MAX_LIMIT_ML,
+        water_logged_ml: MAX_LIMIT_ML
+      });
+    }
+
+    const allowedAmount = Math.min(addedAmount, MAX_LIMIT_ML - currentTotal);
+
+    if (allowedAmount > 0) {
+      const waterId = await getNextSequenceValue('water_id');
+      await WaterLog.create({
+        water_id: waterId,
+        user_id: userId,
+        amount_ml: allowedAmount,
+        logged_at: new Date()
+      });
+      await updateStreak(userId);
+    }
+
+    const newTotal = Math.min(currentTotal + allowedAmount, MAX_LIMIT_ML);
+
+    res.status(201).json({
+      message: 'Water logged successfully.',
+      total_water_ml: newTotal,
+      water_logged_ml: newTotal
+    });
   } catch (error) {
     console.error('Failed to log water:', error);
     res.status(500).json({ message: 'Failed to log water.' });
@@ -401,10 +432,12 @@ export async function getTodaysWater(req, res) {
       logged_at: { $gte: startOfDay, $lte: endOfDay }
     });
 
-    const total_water_ml = waterLogs.reduce((sum, w) => sum + (w.amount_ml || 0), 0);
+    const rawTotal = waterLogs.reduce((sum, w) => sum + (w.amount_ml || 0), 0);
+    const total_water_ml = Math.min(rawTotal, 6000);
 
     res.status(200).json({
-      total_water_ml
+      total_water_ml,
+      water_logged_ml: total_water_ml
     });
   } catch (error) {
     console.error('Failed to get water logs:', error);

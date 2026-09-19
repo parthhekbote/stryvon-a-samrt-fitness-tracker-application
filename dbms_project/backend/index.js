@@ -27,7 +27,7 @@ import {
 } from './controllers/workout.controller.js';
 import { getDietPlans, createDietPlan, logMeal, logMealImage, getTodaysMeals, deleteMealLog, logWater, getTodaysWater } from './controllers/diet.controller.js';
 import { chatWithCoach, getWeeklySummary, getChatHistory } from './controllers/ai.controller.js';
-import { logProgress, getAnalytics, getPdfReportData } from './controllers/progress.controller.js';
+import { logProgress, getAnalytics, getPdfReportData, getMuscleTelemetry } from './controllers/progress.controller.js';
 
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -43,6 +43,10 @@ const PORT = process.env.PORT || 5001;
 
 // Middlewares
 app.use(cors());
+app.use((req, res, next) => {
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+  next();
+});
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -97,10 +101,11 @@ app.get('/api/ai/history', authMiddleware, getChatHistory);
 app.get('/api/ai/weekly-summary', authMiddleware, getWeeklySummary);
 app.get('/api/ai/insights', authMiddleware, getWeeklySummary);
 
-// Progress, Analytics, & Report
+// Progress, Analytics, Telemetry & Report
 app.post('/api/progress', authMiddleware, logProgress);
 app.get('/api/progress/analytics', authMiddleware, getAnalytics);
 app.get('/api/analytics/overview', authMiddleware, getAnalytics);
+app.get('/api/progress/telemetry', authMiddleware, getMuscleTelemetry);
 app.get('/api/progress/pdf-export', authMiddleware, getPdfReportData);
 
 // Basic health check routes for Render hosting

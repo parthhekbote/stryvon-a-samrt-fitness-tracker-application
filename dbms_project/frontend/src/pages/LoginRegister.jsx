@@ -64,11 +64,13 @@ export default function LoginRegister({ onLogin, apiUrl }) {
           });
           const data = await response.json().catch(() => ({ message: 'Invalid response from server.' }));
           if (response.ok && isSubscribed) {
-            if (data.isNewUser) {
-              setWelcomeBanner(`Welcome to STRYVON, ${data.user?.name || 'Athlete'}! Your account has been created.`);
-            }
+            const isMissingProfile = !data.user?.height || !data.user?.weight || !data.user?.age;
             onLogin(data.token, data.user, data.isNewUser);
-            navigate('/', { replace: true });
+            if (data.isNewUser || isMissingProfile) {
+              navigate('/profile', { replace: true, state: { isOnboarding: true } });
+            } else {
+              navigate('/', { replace: true });
+            }
           } else if (isSubscribed) {
             setError(data.message || 'Google sign-in backend verification failed.');
           }
@@ -118,8 +120,13 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         throw new Error(data.message || 'Authentication failed');
       }
 
-      onLogin(data.token, data.user);
-      navigate('/', { replace: true });
+      const isMissingProfile = !data.user?.height || !data.user?.weight || !data.user?.age;
+      onLogin(data.token, data.user, data.isNewUser);
+      if (isMissingProfile && !isLogin) {
+        navigate('/profile', { replace: true, state: { isOnboarding: true } });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err) {
       if (err.name === 'TypeError' && err.message?.includes('fetch')) {
         setError(`Network error: Unable to connect to authentication server at ${apiUrl}. Please ensure backend server is active.`);
@@ -151,11 +158,13 @@ export default function LoginRegister({ onLogin, apiUrl }) {
         throw new Error(data.message || 'Google sign-in backend verification failed.');
       }
 
-      if (data.isNewUser) {
-        setWelcomeBanner(`Welcome to STRYVON, ${data.user?.name || 'Athlete'}! Your account has been created.`);
-      }
+      const isMissingProfile = !data.user?.height || !data.user?.weight || !data.user?.age;
       onLogin(data.token, data.user, data.isNewUser);
-      navigate('/', { replace: true });
+      if (data.isNewUser || isMissingProfile) {
+        navigate('/profile', { replace: true, state: { isOnboarding: true } });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err) {
       console.error('Google Sign-In Error:', err);
       if (err.code === 'auth/popup-closed-by-user') {

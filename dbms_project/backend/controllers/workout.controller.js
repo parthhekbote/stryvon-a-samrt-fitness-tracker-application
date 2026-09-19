@@ -244,6 +244,24 @@ export async function logWorkoutCompletion(req, res) {
     // Increment today's progress table calories_burned without changing manual/profile weight source
     const today = req.body.user_date || new Date().toISOString().split('T')[0];
     const user = await User.findOne({ user_id: userId });
+
+    // Advance split cursor ONLY if completed workout matches current suggested day in active split!
+    if (user && parsedWorkoutDayId) {
+      const activeProg = await Program.findOne({ user_id: userId, is_active: true });
+      if (activeProg && activeProg.schedule_mode === 'rotating') {
+        const progDays = await WorkoutDay.find({ program_id: activeProg.program_id }).sort({ order_index: 1 });
+        if (progDays.length > 0) {
+          const currentCursor = user.current_split_cursor || 1;
+          const currentExpectedDay = progDays.find(d => d.order_index === currentCursor) || progDays[0];
+          
+          if (currentExpectedDay && (currentExpectedDay.workout_day_id === parsedWorkoutDayId)) {
+            user.current_split_cursor = (currentCursor % progDays.length) + 1;
+            await user.save();
+          }
+        }
+      }
+    }
+
     const userWeight = user?.weight || 70.0;
     const userHeight = user?.height;
     const bmi = (userWeight && userHeight) ? parseFloat((userWeight / Math.pow(userHeight / 100, 2)).toFixed(2)) : 0;
@@ -529,6 +547,12 @@ export async function getTodaySuggestedWorkout(req, res) {
     if (!activeProgram) {
       activeProgram = await Program.findOne({ user_id: userId }).lean();
     }
+    if (!activeProgram) {
+      activeProgram = await Program.findOne({ user_id: null, is_active: true }).lean();
+    }
+    if (!activeProgram) {
+      activeProgram = await Program.findOne({ user_id: null }).lean();
+    }
 
     if (!activeProgram) {
       return res.status(200).json({ suggested: null, isRestDay: false, program: null, message: 'No active workout program found.' });
@@ -539,6 +563,9 @@ export async function getTodaySuggestedWorkout(req, res) {
       return res.status(200).json({ suggested: null, isRestDay: false, program: activeProgram, message: 'Program has no workout days.' });
     }
 
+    const user = await User.findOne({ user_id: userId });
+    const cursor = user?.current_split_cursor || 1;
+
     let suggestedDay = null;
     let isRestDay = false;
 
@@ -548,48 +575,21 @@ export async function getTodaySuggestedWorkout(req, res) {
       ? weekday.trim().toLowerCase()
       : weekdays[currentDayIndex].toLowerCase();
 
-    suggestedDay = days.find(d => 
-      d.fixed_weekday && d.fixed_weekday.trim().toLowerCase() === targetWeekday
-    ) || null;
-
     if (activeProgram.schedule_mode === 'fixed') {
-      if (!suggestedDay) {
-        suggestedDay = days.find(d => d.name && d.name.toLowerCase().includes(targetWeekday)) || null;
-      }
+      suggestedDay = days.find(d => 
+        d.fixed_weekday && d.fixed_weekday.trim().toLowerCase() === targetWeekday
+      ) || days.find(d => d.name && d.name.toLowerCase().includes(targetWeekday)) || null;
+
       if (!suggestedDay) {
         isRestDay = true;
       }
-    } else if (!suggestedDay) {
-      const weekdayOrderMap = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 5, 6: 6, 0: 7 };
-      const todayOrder = weekdayOrderMap[currentDayIndex];
-      const matchedByOrder = days.find(d => d.order_index === todayOrder);
+    } else {
+      // Rotating Sequence: Select day based on user's current split cursor
+      suggestedDay = days.find(d => d.order_index === cursor) || days[0];
+    }
 
-      if (matchedByOrder) {
-        suggestedDay = matchedByOrder;
-      } else {
-        const dayLogs = await Promise.all(
-          days.map(async (day) => {
-            const lastLog = await UserWorkout.findOne({
-              user_id: userId,
-              workout_day_id: day.workout_day_id
-            }).sort({ logged_at: -1 }).lean();
-
-            return {
-              day,
-              lastLoggedAt: lastLog ? new Date(lastLog.logged_at).getTime() : 0
-            };
-          })
-        );
-
-        dayLogs.sort((a, b) => {
-          if (a.lastLoggedAt !== b.lastLoggedAt) {
-            return a.lastLoggedAt - b.lastLoggedAt;
-          }
-          return a.day.order_index - b.day.order_index;
-        });
-
-        suggestedDay = dayLogs[0].day;
-      }
+    if (suggestedDay && suggestedDay.name && suggestedDay.name.toLowerCase().includes('rest')) {
+      isRestDay = true;
     }
 
     let exercises = [];
@@ -657,7 +657,14 @@ export async function getMuscleGroupStatus(req, res) {
 
   try {
     let targetMuscleGroups = new Set();
-    const activeProgram = await Program.findOne({ user_id: userId, is_active: true }).lean();
+    let activeProgram = await Program.findOne({ 
+      $or: [{ user_id: userId, is_active: true }, { user_id: null, is_active: true }]
+    }).lean();
+    if (!activeProgram) {
+      activeProgram = await Program.findOne({
+        $or: [{ user_id: userId }, { user_id: null }]
+      }).lean();
+    }
 
     if (activeProgram) {
       const days = await WorkoutDay.find({ program_id: activeProgram.program_id }).lean();

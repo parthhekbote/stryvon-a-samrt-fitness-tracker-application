@@ -15,6 +15,8 @@ import {
   Workout,
   WorkoutExercise,
   DietPlan,
+  Program,
+  WorkoutDay,
   Counter
 } from '../models/index.js';
 
@@ -36,13 +38,11 @@ mongoose.connection.on('error', (err) => {
   console.error('🔴 MongoDB connection error:', err.message);
 });
 
-mongoose.connection.on('disconnected', () => {
-  console.warn('⚠️ MongoDB connection lost/disconnected.');
-});
+mongoose.set('bufferCommands', false);
 
 export async function initDatabase(retries = 3) {
   const uri = process.env.MONGODB_URI || 'mongodb://1jt24ai031_db_user:FRVT6HNHKvQzCQtW@ac-w9per58-shard-00-00.ftw6gye.mongodb.net:27017,ac-w9per58-shard-00-01.ftw6gye.mongodb.net:27017,ac-w9per58-shard-00-02.ftw6gye.mongodb.net:27017/fitgenius_db?replicaSet=atlas-127g4d-shard-0&ssl=true&authSource=admin';
-  console.log('Connecting to MongoDB...');
+  console.log('Connecting to MongoDB (bufferCommands: false)...');
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       await mongoose.connect(uri, {
@@ -130,6 +130,53 @@ async function seedInitialData() {
       await Counter.findByIdAndUpdate('diet_id', { sequence_value: 4 }, { upsert: true });
 
       console.log('MongoDB Seed complete!');
+    }
+
+    // Seed default program if no program exists in DB
+    const programCount = await Program.countDocuments();
+    if (programCount === 0) {
+      console.log('Seeding default 3-Day Push/Pull/Legs workout routine...');
+      await Program.create({
+        program_id: 1,
+        user_id: null,
+        program_name: 'Classic 3-Day Push / Pull / Legs Split',
+        schedule_mode: 'rotating',
+        is_active: true
+      });
+
+      await WorkoutDay.insertMany([
+        {
+          workout_day_id: 1,
+          program_id: 1,
+          workout_id: 2,
+          name: 'Push Day (Chest, Shoulders & Triceps)',
+          muscle_groups: ['chest', 'shoulders', 'triceps'],
+          fixed_weekday: 'Monday',
+          order_index: 1
+        },
+        {
+          workout_day_id: 2,
+          program_id: 1,
+          workout_id: 1,
+          name: 'Pull Day (Back & Biceps)',
+          muscle_groups: ['back', 'biceps'],
+          fixed_weekday: 'Wednesday',
+          order_index: 2
+        },
+        {
+          workout_day_id: 3,
+          program_id: 1,
+          workout_id: 3,
+          name: 'Leg & Core Day (Quads, Glutes & Abs)',
+          muscle_groups: ['legs', 'quads', 'glutes', 'abs'],
+          fixed_weekday: 'Friday',
+          order_index: 3
+        }
+      ]);
+
+      await Counter.findByIdAndUpdate('program_id', { sequence_value: 1 }, { upsert: true });
+      await Counter.findByIdAndUpdate('workout_day_id', { sequence_value: 3 }, { upsert: true });
+      console.log('Default workout routine seeded successfully!');
     }
   } catch (err) {
     console.error('Error seeding MongoDB initial data:', err.message);

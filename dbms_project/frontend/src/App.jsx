@@ -11,6 +11,7 @@ import Exercises from './pages/Exercises';
 import Diet from './pages/Diet';
 import AICoach from './pages/AICoach';
 import Analytics from './pages/Analytics';
+import Telemetry from './pages/Telemetry';
 import Profile from './pages/Profile';
 
 export default function App() {
@@ -89,6 +90,8 @@ export default function App() {
                 <Layout 
                   user={user} 
                   onLogout={handleLogout} 
+                  apiUrl={API_URL}
+                  token={token}
                 />
               ) : (
                 <Navigate to="/login" />
@@ -96,12 +99,14 @@ export default function App() {
             }
           >
             <Route index element={<Dashboard apiUrl={API_URL} token={token} user={user} />} />
-            <Route path="workouts" element={<Workouts apiUrl={API_URL} token={token} />} />
+            <Route path="workouts" element={<Workouts apiUrl={API_URL} token={token} user={user} />} />
             <Route path="exercises" element={<Exercises apiUrl={API_URL} token={token} />} />
             <Route path="diet" element={<Diet apiUrl={API_URL} token={token} user={user} />} />
             <Route path="coach" element={<AICoach apiUrl={API_URL} token={token} user={user} />} />
-            <Route path="analytics" element={<Analytics apiUrl={API_URL} token={token} />} />
+            <Route path="telemetry" element={<Telemetry apiUrl={API_URL} token={token} />} />
+            <Route path="analytics" element={<Analytics apiUrl={API_URL} token={token} user={user} />} />
             <Route path="profile" element={<Profile apiUrl={API_URL} token={token} onLogout={handleLogout} onUpdateUser={(updatedUser) => setUser(updatedUser)} />} />
+            <Route path="settings" element={<Navigate to="/profile" replace />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" />} />

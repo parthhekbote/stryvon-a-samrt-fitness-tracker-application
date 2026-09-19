@@ -22,16 +22,28 @@ import {
   CheckSquare
 } from 'lucide-react';
 import Toast from '../components/Toast';
+import StreakCalendarModal from '../components/StreakCalendarModal';
+import { useOutletContext } from 'react-router-dom';
 
 const MUSCLE_OPTIONS = ['chest', 'back', 'legs', 'shoulders', 'arms', 'biceps', 'triceps', 'quads', 'glutes', 'core', 'abs'];
 const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
-export default function Workouts({ apiUrl, token }) {
+export default function Workouts({ apiUrl, token, user }) {
+  const outletContext = useOutletContext();
+  const onOpenStreakModal = outletContext?.onOpenStreakModal;
+
   const [workouts, setWorkouts] = useState([]);
   const [exercises, setExercises] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('templates'); // 'templates', 'history', 'log'
+
+  // Modals State
+  const [showSwapModal, setShowSwapModal] = useState(false);
+  const [showProgramModal, setShowProgramModal] = useState(false);
+  const [showFreestyleModal, setShowFreestyleModal] = useState(false);
+  const [showAddExPicker, setShowAddExPicker] = useState(false);
+  const [showStreakCalendar, setShowStreakCalendar] = useState(false);
 
   // Day-Based & Muscle Group Scheduling State
   const [suggestedData, setSuggestedData] = useState(null); // { suggested, program, allDays }
@@ -39,12 +51,6 @@ export default function Workouts({ apiUrl, token }) {
   const [currentWorkoutDayRef, setCurrentWorkoutDayRef] = useState(null);
   const [isCustomSession, setIsCustomSession] = useState(false);
   const [customMuscleTags, setCustomMuscleTags] = useState([]);
-
-  // Modals State
-  const [showSwapModal, setShowSwapModal] = useState(false);
-  const [showProgramModal, setShowProgramModal] = useState(false);
-  const [showFreestyleModal, setShowFreestyleModal] = useState(false);
-  const [showAddExPicker, setShowAddExPicker] = useState(false);
   const [customExInput, setCustomExInput] = useState('');
 
   // Freestyle Workout Selection State
@@ -84,35 +90,86 @@ export default function Workouts({ apiUrl, token }) {
   const [selectedWorkout, setSelectedWorkout] = useState(null);
   const [logDuration, setLogDuration] = useState('');
   const [logCalories, setLogCalories] = useState('');
-  const [logExercises, setLogExercises] = useState([]); // [{ exercise_id, exercise_name }]
+  const [logExercises, setLogExercises] = useState([]); // [{ exercise_id, exercise_name, setsData: [{ set_number, weight, reps, done }] }]
   const [checkedExercises, setCheckedExercises] = useState({}); // { [exercise_name]: boolean }
   const [submitStatus, setSubmitStatus] = useState('idle'); // 'idle' | 'submitting' | 'success' | 'error'
   const [toast, setToast] = useState(null);
 
+  // Floating Rest Timer State (90s non-blocking)
+  const [restTimer, setRestTimer] = useState({ active: false, seconds: 90, total: 90, exName: '' });
+
+  // Rest timer interval effect
+  useEffect(() => {
+    let timerId = null;
+    if (restTimer.active && restTimer.seconds > 0) {
+      timerId = setInterval(() => {
+        setRestTimer(prev => {
+          if (prev.seconds <= 1) {
+            return { ...prev, active: false, seconds: 0 };
+          }
+          return { ...prev, seconds: prev.seconds - 1 };
+        });
+      }, 1000);
+    }
+    return () => {
+      if (timerId) clearInterval(timerId);
+    };
+  }, [restTimer.active, restTimer.seconds]);
+
+  const triggerRestTimer = (exName) => {
+    setRestTimer({ active: true, seconds: 90, total: 90, exName });
+  };
+
+  const createInitialSetsData = (defaultSetsCount = 3, defaultRepsCount = 10) => {
+    const sets = [];
+    const count = Math.max(1, defaultSetsCount || 3);
+    for (let i = 1; i <= count; i++) {
+      sets.push({
+        set_number: i,
+        weight: 20,
+        reps: defaultRepsCount || 10,
+        done: false
+      });
+    }
+    return sets;
+  };
+
   const fetchWorkoutsAndHistory = async () => {
     try {
       const headers = { 'Authorization': `Bearer ${token}` };
+      const localWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
-      // Fetch Workouts
-      const workRes = await fetch(`${apiUrl}/workouts`, { headers });
-      const workData = await workRes.json();
-      if (workRes.ok) setWorkouts(workData.workouts);
+      const [workRes, histRes, exRes, sugRes, progRes] = await Promise.allSettled([
+        fetch(`${apiUrl}/workouts`, { headers }),
+        fetch(`${apiUrl}/workouts/history`, { headers }),
+        fetch(`${apiUrl}/exercises`, { headers }),
+        fetch(`${apiUrl}/workouts/suggested?weekday=${encodeURIComponent(localWeekday)}`, { headers }),
+        fetch(`${apiUrl}/workouts/programs`, { headers })
+      ]);
 
-      // Fetch History
-      const histRes = await fetch(`${apiUrl}/workouts/history`, { headers });
-      const histData = await histRes.json();
-      if (histRes.ok) setHistory(histData.history);
-
-      // Fetch Exercise Catalog
-      const exRes = await fetch(`${apiUrl}/exercises`, { headers });
-      const exData = await exRes.json();
-      if (exRes.ok) setExercises(exData.exercises);
-
-      // Fetch Scheduling Data
-      await fetchSchedulingData();
+      if (workRes.status === 'fulfilled' && workRes.value.ok) {
+        const workData = await workRes.value.json();
+        setWorkouts(workData.workouts || []);
+      }
+      if (histRes.status === 'fulfilled' && histRes.value.ok) {
+        const histData = await histRes.value.json();
+        setHistory(histData.history || []);
+      }
+      if (exRes.status === 'fulfilled' && exRes.value.ok) {
+        const exData = await exRes.value.json();
+        setExercises(exData.exercises || []);
+      }
+      if (sugRes.status === 'fulfilled' && sugRes.value.ok) {
+        const sugData = await sugRes.value.json();
+        setSuggestedData(sugData);
+      }
+      if (progRes.status === 'fulfilled' && progRes.value.ok) {
+        const progData = await progRes.value.json();
+        setPrograms(progData.programs || []);
+      }
 
     } catch (err) {
-      console.error(err);
+      console.error('Error loading workout data:', err);
     } finally {
       setLoading(false);
     }
@@ -123,15 +180,19 @@ export default function Workouts({ apiUrl, token }) {
       const headers = { 'Authorization': `Bearer ${token}` };
       const localWeekday = new Date().toLocaleDateString('en-US', { weekday: 'long' });
 
-      // Suggested Workout
-      const sugRes = await fetch(`${apiUrl}/workouts/suggested?weekday=${encodeURIComponent(localWeekday)}`, { headers });
-      const sugData = await sugRes.json();
-      if (sugRes.ok) setSuggestedData(sugData);
+      const [sugRes, progRes] = await Promise.allSettled([
+        fetch(`${apiUrl}/workouts/suggested?weekday=${encodeURIComponent(localWeekday)}`, { headers }),
+        fetch(`${apiUrl}/workouts/programs`, { headers })
+      ]);
 
-      // Programs List
-      const progRes = await fetch(`${apiUrl}/workouts/programs`, { headers });
-      const progData = await progRes.json();
-      if (progRes.ok) setPrograms(progData.programs || []);
+      if (sugRes.status === 'fulfilled' && sugRes.value.ok) {
+        const sugData = await sugRes.value.json();
+        setSuggestedData(sugData);
+      }
+      if (progRes.status === 'fulfilled' && progRes.value.ok) {
+        const progData = await progRes.value.json();
+        setPrograms(progData.programs || []);
+      }
 
     } catch (err) {
       console.error('Failed to fetch scheduling data:', err);
@@ -192,14 +253,18 @@ export default function Workouts({ apiUrl, token }) {
         }
       }
 
-      // Limit to max 4 exercises per session
-      if (exerciseList && exerciseList.length > 4) {
-        exerciseList = exerciseList.slice(0, 4);
+      // Limit to max 5 exercises per session
+      if (exerciseList && exerciseList.length > 5) {
+        exerciseList = exerciseList.slice(0, 5);
       }
 
       const initialChecked = {};
-      exerciseList.forEach(ex => {
+      const formattedExercises = exerciseList.map(ex => {
         initialChecked[ex.exercise_name] = true;
+        return {
+          ...ex,
+          setsData: createInitialSetsData(ex.default_sets, ex.default_reps)
+        };
       });
 
       setSelectedWorkout({
@@ -211,7 +276,7 @@ export default function Workouts({ apiUrl, token }) {
       setCustomMuscleTags(workoutDay.muscle_groups || []);
       setLogDuration('45');
       setLogCalories('');
-      setLogExercises(exerciseList);
+      setLogExercises(formattedExercises);
       setCheckedExercises(initialChecked);
       setShowSwapModal(false);
       setActiveTab('log');
@@ -233,25 +298,39 @@ export default function Workouts({ apiUrl, token }) {
       });
       const data = await res.json();
 
-      if (res.ok) {
-        const exList = data.exercises || [];
-        const initialChecked = {};
-        exList.forEach(ex => {
-          initialChecked[ex.exercise_name] = true;
+      let exList = [];
+      if (res.ok && data.exercises && data.exercises.length > 0) {
+        exList = data.exercises;
+      } else {
+        // Fallback: pick exercises matching workout name or overall catalog
+        const wName = (workout.workout_name || '').toLowerCase();
+        exList = exercises.filter(ex => {
+          const mg = (ex.muscle_group || '').toLowerCase();
+          return wName.includes(mg) || (ex.muscle_groups || []).some(m => wName.includes(m.toLowerCase()));
         });
-
-        setSelectedWorkout(workout);
-        setCurrentWorkoutDayRef(null);
-        setIsCustomSession(false);
-        setCustomMuscleTags([]);
-        setLogDuration(workout.duration ? String(workout.duration) : '45');
-        setLogCalories(workout.calories_burned ? String(workout.calories_burned) : '');
-        setLogExercises(exList);
-        setCheckedExercises(initialChecked);
-        setActiveTab('log');
+        if (exList.length === 0) exList = exercises.slice(0, 4);
       }
+
+      const initialChecked = {};
+      const formattedExercises = exList.map(ex => {
+        initialChecked[ex.exercise_name] = true;
+        return {
+          ...ex,
+          setsData: createInitialSetsData(ex.default_sets, ex.default_reps)
+        };
+      });
+
+      setSelectedWorkout(workout);
+      setCurrentWorkoutDayRef(null);
+      setIsCustomSession(false);
+      setCustomMuscleTags(workout.muscle_groups || []);
+      setLogDuration(workout.duration ? String(workout.duration) : '45');
+      setLogCalories(workout.calories_burned ? String(workout.calories_burned) : '');
+      setLogExercises(formattedExercises);
+      setCheckedExercises(initialChecked);
+      setActiveTab('log');
     } catch (err) {
-      console.error(err);
+      console.error('Error starting template workout:', err);
     } finally {
       setLoading(false);
     }
@@ -330,7 +409,7 @@ export default function Workouts({ apiUrl, token }) {
         await fetchSchedulingData();
         setToast({
           type: 'success',
-          title: 'Program Created! 🎯',
+          title: 'Program Created!',
           message: `Successfully saved ${progName}.`
         });
       }
@@ -339,6 +418,61 @@ export default function Workouts({ apiUrl, token }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Update a set parameter for a specific exercise
+  const handleUpdateSet = (exIndex, setIndex, field, value) => {
+    setLogExercises(prev => {
+      const copy = [...prev];
+      const ex = { ...copy[exIndex] };
+      const sets = [...(ex.setsData || [])];
+      const curSet = { ...sets[setIndex] };
+
+      if (field === 'weight') curSet.weight = Math.max(0, parseFloat(value) || 0);
+      else if (field === 'reps') curSet.reps = Math.max(1, parseInt(value) || 1);
+      else if (field === 'done') {
+        curSet.done = !curSet.done;
+        if (curSet.done) {
+          triggerRestTimer(ex.exercise_name);
+        }
+      }
+
+      sets[setIndex] = curSet;
+      ex.setsData = sets;
+      copy[exIndex] = ex;
+      return copy;
+    });
+  };
+
+  const handleAddSetToExercise = (exIndex) => {
+    setLogExercises(prev => {
+      const copy = [...prev];
+      const ex = { ...copy[exIndex] };
+      const sets = [...(ex.setsData || [])];
+      const lastSet = sets[sets.length - 1] || { weight: 20, reps: 10 };
+      sets.push({
+        set_number: sets.length + 1,
+        weight: lastSet.weight,
+        reps: lastSet.reps,
+        done: false
+      });
+      ex.setsData = sets;
+      copy[exIndex] = ex;
+      return copy;
+    });
+  };
+
+  const handleRemoveSetFromExercise = (exIndex, setIndex) => {
+    setLogExercises(prev => {
+      const copy = [...prev];
+      const ex = { ...copy[exIndex] };
+      let sets = [...(ex.setsData || [])];
+      if (sets.length <= 1) return prev;
+      sets = sets.filter((_, idx) => idx !== setIndex).map((s, idx) => ({ ...s, set_number: idx + 1 }));
+      ex.setsData = sets;
+      copy[exIndex] = ex;
+      return copy;
+    });
   };
 
   // Toggle Exercise Checkbox in Log view
@@ -368,7 +502,7 @@ export default function Workouts({ apiUrl, token }) {
     });
   };
 
-  // Submit Completed Workout Checklist
+  // Submit Completed Workout Session with Set-by-Set Data
   const handleSubmitLog = async (e) => {
     e.preventDefault();
     setSubmitStatus('submitting');
@@ -378,6 +512,30 @@ export default function Workouts({ apiUrl, token }) {
     const completedExerciseNames = logExercises
       .filter(ex => checkedExercises[ex.exercise_name] !== false)
       .map(ex => ex.exercise_name);
+
+    // Build sets array for backend logging
+    const setsPayload = [];
+    logExercises.forEach(ex => {
+      if (checkedExercises[ex.exercise_name] !== false) {
+        if (ex.setsData && ex.setsData.length > 0) {
+          ex.setsData.forEach(s => {
+            setsPayload.push({
+              exercise_id: ex.exercise_id || 1,
+              set_number: s.set_number || 1,
+              reps: s.reps || 10,
+              weight: s.weight || 0
+            });
+          });
+        } else {
+          setsPayload.push({
+            exercise_id: ex.exercise_id || 1,
+            set_number: 1,
+            reps: 10,
+            weight: 0
+          });
+        }
+      }
+    });
 
     try {
       const response = await fetch(`${apiUrl}/workouts/log`, {
@@ -392,9 +550,10 @@ export default function Workouts({ apiUrl, token }) {
           custom_name: selectedWorkout?.workout_name || null,
           is_custom: isCustomSession,
           muscle_groups: customMuscleTags,
-          duration: parseInt(logDuration),
+          duration: parseInt(logDuration) || 45,
           calories_burned: logCalories ? parseInt(logCalories) : null,
-          completed_exercises: completedExerciseNames
+          completed_exercises: completedExerciseNames,
+          sets: setsPayload
         })
       });
 
@@ -403,12 +562,12 @@ export default function Workouts({ apiUrl, token }) {
       if (response.ok) {
         setSubmitStatus('success');
         
-        const estBurn = logCalories ? parseInt(logCalories) : (data.caloriesBurned || Math.round(parseInt(logDuration) * 7.5));
+        const estBurn = logCalories ? parseInt(logCalories) : (data.caloriesBurned || Math.round((parseInt(logDuration) || 45) * 7.5));
         
         setToast({
           type: 'success',
-          title: 'Workout Complete! 💪',
-          message: 'Checklist recorded successfully. Great effort today!',
+          title: 'Workout Saved!',
+          message: `Workout Saved! +${estBurn} kcal burned`,
           summary: {
             exercises: completedExerciseNames.length,
             duration: logDuration,
@@ -489,6 +648,16 @@ export default function Workouts({ apiUrl, token }) {
           >
             <History size={15} />
             History Log
+          </button>
+          <button
+            onClick={() => {
+              if (typeof onOpenStreakModal === 'function') onOpenStreakModal();
+              else setShowStreakCalendar(true);
+            }}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold font-display uppercase tracking-wider bg-[#0A0A0A] hover:bg-[#262626] text-amber-400 border border-amber-400/40 cursor-pointer transition-all min-h-[44px]"
+          >
+            <Flame size={15} className="fill-amber-400" />
+            Streak Calendar
           </button>
           <button
             onClick={() => setShowProgramModal(true)}
@@ -744,45 +913,43 @@ export default function Workouts({ apiUrl, token }) {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, x: -30, height: 0, marginBottom: 0, padding: 0 }}
                       transition={{ duration: 0.22, ease: 'easeInOut' }}
-                      onClick={() => handleToggleExerciseCheck(ex.exercise_name)}
-                      className={`p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                      className={`p-4 rounded-2xl border transition-all ${
                         isChecked 
-                          ? 'bg-[#D4FF00]/10 border-[#D4FF00]/50 text-white shadow-sm' 
+                          ? 'bg-[#1E1E1E] border-[#D4FF00]/40 text-white shadow-sm' 
                           : 'bg-[#0A0A0A] border-[#474747]/40 text-[#474747] opacity-60'
                       }`}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className={`p-1.5 rounded-lg shrink-0 transition-colors flex items-center justify-center min-h-[36px] min-w-[36px] ${isChecked ? 'bg-[#D4FF00] text-black' : 'bg-[#1E1E1E] text-[#474747] border border-[#474747]/50'}`}>
-                          <motion.div
-                            key={isChecked ? 'check' : 'uncheck'}
-                            initial={{ scale: 0.5, opacity: 0 }}
-                            animate={{ scale: [1.25, 1], opacity: 1 }}
-                            transition={{ type: 'spring', stiffness: 450, damping: 25 }}
-                          >
-                            {isChecked ? <Check size={18} strokeWidth={3} /> : <Square size={18} />}
-                          </motion.div>
-                        </div>
-                        <span className={`font-extrabold text-sm sm:text-base font-display truncate ${isChecked ? 'text-white' : 'text-[#474747] line-through'}`}>
-                          {ex.exercise_name}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-[10px] sm:text-xs font-bold font-display uppercase tracking-wider ${isChecked ? 'text-[#D4FF00]' : 'text-[#474747]'}`}>
-                          {isChecked ? 'DONE ✓' : 'SKIPPED'}
-                        </span>
-                        <motion.button
-                          whileTap={{ scale: 0.88 }}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleRemoveExerciseFromSession(ex.exercise_name);
-                          }}
-                          className="text-slate-500 hover:text-rose-400 p-2.5 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
-                          title="Delete exercise from session"
+                      <div className="flex items-center justify-between gap-3">
+                        <div 
+                          onClick={() => handleToggleExerciseCheck(ex.exercise_name)}
+                          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
                         >
-                          <Trash2 size={16} />
-                        </motion.button>
+                          <div 
+                            className={`p-2 rounded-xl shrink-0 transition-colors flex items-center justify-center min-h-[40px] min-w-[40px] ${isChecked ? 'bg-[#D4FF00] text-black font-extrabold' : 'bg-[#1E1E1E] text-[#474747] border border-[#474747]/50'}`}
+                          >
+                            {isChecked ? <Check size={20} strokeWidth={3} /> : <Square size={20} />}
+                          </div>
+                          <div>
+                            <span className={`font-extrabold text-lg font-display block truncate ${isChecked ? 'text-white' : 'text-[#474747] line-through'}`}>
+                              {ex.exercise_name}
+                            </span>
+                            <span className="text-xs text-slate-400 font-bold uppercase font-display">
+                              {ex.muscle_group || 'Target Muscle'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <motion.button
+                            whileTap={{ scale: 0.88 }}
+                            type="button"
+                            onClick={() => handleRemoveExerciseFromSession(ex.exercise_name)}
+                            className="text-slate-500 hover:text-rose-400 p-2 rounded-xl hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            title="Delete exercise from session"
+                          >
+                            <Trash2 size={18} />
+                          </motion.button>
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -859,7 +1026,7 @@ export default function Workouts({ apiUrl, token }) {
 
                   {/* Catalog Exercises List sorted by target muscle match */}
                   <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1 pt-1">
-                    {[...exercises].sort((a, b) => {
+                    {[...(exercises || [])].sort((a, b) => {
                       const targetTagArr = (customMuscleTags || []).map(t => t.toLowerCase());
                       const aMatch = targetTagArr.some(t => (a.muscle_group || '').toLowerCase().includes(t));
                       const bMatch = targetTagArr.some(t => (b.muscle_group || '').toLowerCase().includes(t));
@@ -885,7 +1052,7 @@ export default function Workouts({ apiUrl, token }) {
                         >
                           <span>{ex.exercise_name} <span className="text-[10px] text-slate-400">({ex.muscle_group})</span></span>
                           {alreadyAdded ? (
-                            <span className="text-[10px] text-slate-500 uppercase">In Session ✓</span>
+                            <span className="text-[10px] text-slate-500 uppercase">In Session</span>
                           ) : (
                             <span className="text-xs text-[#D4FF00] font-extrabold uppercase">+ Add</span>
                           )}
@@ -920,7 +1087,7 @@ export default function Workouts({ apiUrl, token }) {
             {submitStatus === 'success' && (
               <>
                 <CheckCircle2 size={24} strokeWidth={3} className="text-black" />
-                SESSION RECORDED ✓
+                SESSION RECORDED
               </>
             )}
             {submitStatus === 'error' && (
@@ -1326,6 +1493,57 @@ export default function Workouts({ apiUrl, token }) {
           </motion.div>
         </div>
       )}
+
+      {/* Floating 90s Non-Blocking Rest Timer */}
+      {restTimer.active && (
+        <motion.div
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 50, opacity: 0 }}
+          className="fixed bottom-20 md:bottom-6 right-6 z-40 bg-[#1E1E1E] border-2 border-[#D4FF00] p-4 rounded-2xl shadow-2xl flex items-center gap-4 max-w-sm w-full"
+        >
+          <div className="p-3 bg-[#D4FF00]/10 rounded-xl text-[#D4FF00]">
+            <Clock size={24} className="animate-pulse" />
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs font-bold text-white font-display uppercase tracking-wider">REST TIMER ({restTimer.exName})</span>
+              <span className="text-sm font-extrabold text-[#D4FF00] font-display">{restTimer.seconds}s</span>
+            </div>
+            <div className="w-full bg-[#0A0A0A] h-2 rounded-full overflow-hidden">
+              <div
+                className="bg-[#D4FF00] h-full transition-all duration-1000"
+                style={{ width: `${(restTimer.seconds / restTimer.total) * 100}%` }}
+              />
+            </div>
+          </div>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              onClick={() => setRestTimer(prev => ({ ...prev, seconds: prev.seconds + 30 }))}
+              className="px-2.5 py-1 bg-[#0A0A0A] hover:bg-[#262626] text-[#D4FF00] border border-[#D4FF00]/40 rounded-lg text-xs font-bold font-display uppercase cursor-pointer"
+            >
+              +30s
+            </button>
+            <button
+              type="button"
+              onClick={() => setRestTimer(prev => ({ ...prev, active: false }))}
+              className="p-1 text-slate-400 hover:text-white cursor-pointer"
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Cult.fit Streak Calendar Modal */}
+      <StreakCalendarModal
+        isOpen={showStreakCalendar}
+        onClose={() => setShowStreakCalendar(false)}
+        streakCount={user?.streak_count || 0}
+        highestStreak={user?.highest_streak || user?.streak_count || 0}
+        history={history}
+      />
 
       {/* Global Toast Notifications */}
       <Toast toast={toast} onClose={() => setToast(null)} />
