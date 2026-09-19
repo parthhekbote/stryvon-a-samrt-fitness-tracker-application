@@ -21,19 +21,16 @@ async function callAIModel(systemPrompt, userPrompt) {
   const geminiKey = (process.env.GEMINI_API_KEY || '').trim();
 
   console.log(`\n==================================================`);
-  console.log(`=== [AI COACH INCOMING USER PROMPT] ===: "${userPrompt}"`);
-  console.log(`=== [FULL PROMPT SENT TO MODEL] ===:\n${systemPrompt}\n\nClient Input: "${userPrompt}"`);
+  console.log(`=== [AI COACH USER PROMPT] ===: "${userPrompt}"`);
   console.log(`==================================================\n`);
 
   // 1. Groq API Path (when GROQ_API_KEY starts with gsk_)
   if (groqKey.startsWith('gsk_')) {
     const groq = new Groq({ apiKey: groqKey });
     const models = [
-      'groq/compound-mini',
-      'groq/compound',
-      'openai/gpt-oss-20b',
       'llama-3.3-70b-versatile',
-      'llama-3.1-8b-instant'
+      'llama-3.1-8b-instant',
+      'mixtral-8x7b-32768'
     ];
 
     for (const modelName of models) {
@@ -50,7 +47,7 @@ async function callAIModel(systemPrompt, userPrompt) {
         });
         const text = completion.choices[0]?.message?.content;
         if (text) {
-          console.log(`Successfully generated AI response via Groq (${modelName})!`);
+          console.log(`✅ [AI COACH REAL RESPONSE] Generated successfully via Groq (${modelName})`);
           return text;
         }
       } catch (err) {
@@ -61,10 +58,10 @@ async function callAIModel(systemPrompt, userPrompt) {
 
   // 2. Google Gemini REST API Path
   if (geminiKey) {
-    const geminiModels = ['gemini-2.5-flash', 'gemini-3.6-flash', 'gemini-flash-latest', 'gemini-1.5-flash'];
+    const geminiModels = ['gemini-1.5-flash', 'gemini-1.5-pro'];
     for (const modelName of geminiModels) {
       try {
-        console.log(`Attempting Google Gemini REST API completion (${modelName}, Key prefix: ${geminiKey.slice(0, 8)}...)...`);
+        console.log(`Attempting Google Gemini REST API completion (${modelName})...`);
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${geminiKey}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -83,7 +80,7 @@ async function callAIModel(systemPrompt, userPrompt) {
           const data = await response.json();
           const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
           if (text) {
-            console.log(`Successfully generated AI response via Google Gemini API (${modelName})!`);
+            console.log(`✅ [AI COACH REAL RESPONSE] Generated successfully via Google Gemini API (${modelName})`);
             return text;
           }
         } else {
@@ -96,6 +93,7 @@ async function callAIModel(systemPrompt, userPrompt) {
     }
   }
 
+  console.warn('⚠️ [AI COACH FALLBACK] All API attempts failed or no keys configured. Using intelligent template fallback.');
   return null;
 }
 
